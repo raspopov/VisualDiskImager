@@ -45,7 +45,9 @@ BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
 	ON_WM_SIZE()
 	ON_MESSAGE( WM_LOG, &CVisualDiskImagerDlg::OnLog )
 	ON_MESSAGE( WM_DONE, &CVisualDiskImagerDlg::OnDone )
+	ON_MESSAGE( WM_ENUM, &CVisualDiskImagerDlg::OnEnum )
 	ON_BN_CLICKED(IDC_VERIFY_BUTTON, &CVisualDiskImagerDlg::OnBnClickedVerifyButton)
+	ON_MESSAGE( WM_DEVICECHANGE, &CVisualDiskImagerDlg::OnDeviceChange )
 END_MESSAGE_MAP()
 
 // CVisualDiskImagerDlg message handlers
@@ -124,9 +126,9 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 		SetFile( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	}
 
-	OnDone( 0, 0 );
+	PostMessage( WM_DONE );
 
-	OnBnClickedRefresh();
+	PostMessage( WM_ENUM );
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -160,7 +162,7 @@ HCURSOR CVisualDiskImagerDlg::OnQueryDragIcon()
 
 void CVisualDiskImagerDlg::OnOK()
 {
-	if ( m_Thread.joinable() )
+	if ( IsStarted() )
 	{
 		// "Stop" button pressed
 		if ( AfxMessageBox( IDS_CANCEL_ASK, MB_ICONEXCLAMATION | MB_YESNO ) == IDYES )
@@ -182,7 +184,7 @@ void CVisualDiskImagerDlg::OnOK()
 
 void CVisualDiskImagerDlg::OnBnClickedVerifyButton()
 {
-	if ( m_Thread.joinable() )
+	if ( IsStarted() )
 	{
 		// "Stop" button pressed
 		m_bCancel = true;
@@ -235,7 +237,7 @@ void CVisualDiskImagerDlg::Start(bool bWrite)
 
 void CVisualDiskImagerDlg::OnCancel()
 {
-	if ( m_Thread.joinable() )
+	if ( IsStarted() )
 	{
 		if ( AfxMessageBox( IDS_CANCEL_ASK, MB_ICONEXCLAMATION | MB_YESNO ) != IDYES )
 		{
@@ -280,9 +282,18 @@ LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
 	return 0;
 }
 
+LRESULT CVisualDiskImagerDlg::OnEnum(WPARAM wParam, LPARAM /*lParam*/)
+{
+	CWaitCursor wc;
+
+	EnumDevices( wParam );
+
+	return 0;
+}
+
 void CVisualDiskImagerDlg::Stop()
 {
-	if ( m_Thread.joinable() )
+	if ( IsStarted() )
 	{
 		m_bCancel = true;
 
@@ -294,7 +305,7 @@ void CVisualDiskImagerDlg::Stop()
 		{
 		}
 
-		if ( m_Thread.joinable() )
+		if ( IsStarted() )
 		{
 			m_Thread.detach();
 		}
@@ -308,7 +319,6 @@ void CVisualDiskImagerDlg::OnDestroy()
 	ClearDevices();
 
 	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
-
 
 	CDialogExSized::OnDestroy();
 }
@@ -352,11 +362,9 @@ void CVisualDiskImagerDlg::OnEnChangeBrowse()
 
 void CVisualDiskImagerDlg::OnBnClickedRefresh()
 {
-	CWaitCursor wc;
-
 	ClearLog();
 
-	EnumDevices();
+	PostMessage( WM_ENUM );
 }
 
 void CVisualDiskImagerDlg::ClearDevices()
@@ -406,7 +414,7 @@ LRESULT CVisualDiskImagerDlg::OnLog(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CVisualDiskImagerDlg::UpdateSize()
+void CVisualDiskImagerDlg::UpdateSize() noexcept
 {
 	CRect rc;
 	m_wndLog.GetWindowRect( &rc );
@@ -421,4 +429,17 @@ void CVisualDiskImagerDlg::OnSize(UINT nType, int cx, int cy)
 	{
 		UpdateSize();
 	}
+}
+
+LRESULT CVisualDiskImagerDlg::OnDeviceChange(WPARAM wParam, LPARAM lParam)
+{
+	// Asynchronous call from WMI
+	if ( wParam == DBT_DEVNODES_CHANGED )
+	{
+		if ( ! IsStarted() )
+		{
+			PostMessage( WM_ENUM, TRUE );
+		}
+	}
+	return TRUE;
 }

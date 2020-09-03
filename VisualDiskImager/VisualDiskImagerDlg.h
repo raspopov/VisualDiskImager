@@ -38,7 +38,12 @@ protected:
 	void Start(bool bWrite);
 	void Stop();
 
-	void UpdateSize();
+	inline bool IsStarted() const noexcept
+	{
+		 return m_Thread.joinable();
+	}
+
+	void UpdateSize() noexcept;
 
 	// Clear enumerated devices list (i.e. m_wndDevices)
 	void ClearDevices();
@@ -47,7 +52,7 @@ protected:
 	void SetFile(LPCTSTR szFilename = nullptr);
 
 	// Enumerate disk volumes
-	void EnumDevices();
+	void EnumDevices(bool bSilent);
 
 	// Return selected device
 	CDevice* GetSelectedDevice() const;
@@ -73,10 +78,13 @@ protected:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg LRESULT OnLog(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnDone(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnEnum(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedVerifyButton();
+	afx_msg LRESULT OnDeviceChange(WPARAM wParam, LPARAM lParam);
 
 	DECLARE_MESSAGE_MAP()
 };
 
 #define WM_LOG		( WM_USER + 1 )	// Log window message
 #define WM_DONE		( WM_USER + 2 )	// End of task message
+#define WM_ENUM		( WM_USER + 3 )	// End of task message

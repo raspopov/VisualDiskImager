@@ -9,9 +9,9 @@
 #define new DEBUG_NEW
 #endif
 
-void CVisualDiskImagerDlg::EnumDevices()
+void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 {
-	Log( LOG_ACTION, IDS_DEVICE_ENUM );
+	if ( ! bSilent ) Log( LOG_ACTION, IDS_DEVICE_ENUM );
 
 	ClearDevices();
 
@@ -48,15 +48,15 @@ void CVisualDiskImagerDlg::EnumDevices()
 						auto device = std::make_unique< CDevice >();
 						if ( device->Init( disk ) )
 						{
-							Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)device->Name );
+							if ( ! bSilent ) Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)device->Name );
 
-							device->GetDeviceVolumes();
+							device->GetDeviceVolumes( bSilent );
 
 							m_Devices.push_back( std::move( device ) );
 						}
 						else
 						{
-							Log( LOG_INFO, IDS_DEVICE_SKIP, (LPCTSTR)device->Name );
+							if ( ! bSilent ) Log( LOG_INFO, IDS_DEVICE_SKIP, (LPCTSTR)device->Name );
 						}
 					}
 				}
@@ -66,7 +66,7 @@ void CVisualDiskImagerDlg::EnumDevices()
 
 	if ( FAILED ( hr ) )
 	{
-		Log( LOG_WARNING, IDS_WMI_ERROR, (LPCTSTR)GetErrorString( hr) );
+		if ( ! bSilent ) Log( LOG_WARNING, IDS_WMI_ERROR, (LPCTSTR)GetErrorString( hr) );
 	}
 
 	const CString sRemovable = LoadString( IDS_REMOVABLE );
@@ -97,5 +97,7 @@ void CVisualDiskImagerDlg::EnumDevices()
 		}
 	}
 
-	Log( LOG_INFO, IDS_DONE );
+	if ( ! bSilent ) Log( LOG_INFO, IDS_DONE );
+
+	UpdateWindow();
 }

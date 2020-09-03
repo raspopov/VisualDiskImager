@@ -84,9 +84,9 @@ bool CDevice::Init(IWbemClassObject* disk)
 	return false;
 }
 
-void CDevice::GetDeviceVolumes()
+void CDevice::GetDeviceVolumes(bool bSilent)
 {
-	Log( LOG_ACTION, IDS_ENUM_VOLUME, (LPCTSTR) Name );
+	if ( ! bSilent ) Log( LOG_ACTION, IDS_ENUM_VOLUME, (LPCTSTR) Name );
 
 	Volumes.clear();
 
@@ -150,7 +150,7 @@ void CDevice::GetDeviceVolumes()
 
 							if ( volume->PathNames.empty() )
 							{
-								Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)volume->Name );
+								if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)volume->Name );
 							}
 							else
 							{
@@ -160,7 +160,7 @@ void CDevice::GetDeviceVolumes()
 								{
 									sVolumePathName += path + _T(' ');
 								}
-								Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumePathName );
+								if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumePathName );
 							}
 
 							Volumes.emplace_back( std::move( volume ) );
@@ -177,7 +177,7 @@ void CDevice::GetDeviceVolumes()
 
 	if ( Volumes.empty() )
 	{
-		Log( LOG_INFO, IDS_VOLUME_EMPTY );
+		if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_EMPTY );
 	}
 }
 

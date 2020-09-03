@@ -14,7 +14,7 @@ public:
 	bool Init(IWbemClassObject* disk);
 
 	// Find all volumes of this device (fills Volumes member)
-	void GetDeviceVolumes();
+	void GetDeviceVolumes(bool bSilent);
 
 	// Open device
 	bool Open(bool bWrite);

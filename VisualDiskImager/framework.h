@@ -19,6 +19,7 @@
 #include <afxwin.h>
 #include <afxext.h>
 
+#include <dbt.h>
 #include <shlobj.h>
 #include <winioctl.h>
 #include <wbemidl.h>

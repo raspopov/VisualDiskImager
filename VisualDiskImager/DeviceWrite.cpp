@@ -61,7 +61,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 	Log( LOG_INFO, IDS_FILE_SIZE, (LPCTSTR)FormatByteSizeEx( file_size ) );
 
 	CDevice device( szDevice );
-	device.GetDeviceVolumes();
+	device.GetDeviceVolumes( false );
 
 	if ( bWrite )
 	{
