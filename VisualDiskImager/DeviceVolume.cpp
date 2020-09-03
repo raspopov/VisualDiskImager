@@ -2,8 +2,8 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
 #include "pch.h"
-#include "DeviceVolume.h"
 #include "VisualDiskImager.h"
+#include "DeviceVolume.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -11,8 +11,9 @@
 
 // CDeviceVolume
 
-CDeviceVolume::CDeviceVolume() noexcept
-	: m_bLocked	( false )
+CDeviceVolume::CDeviceVolume(LPCTSTR szVolumeName)
+	: Name		( szVolumeName )
+	, m_bLocked	( false )
 {
 }
 
@@ -21,68 +22,81 @@ CDeviceVolume::~CDeviceVolume()
 	Unlock();
 }
 
-bool CDeviceVolume::Open(LPCTSTR szVolumeName)
+bool CDeviceVolume::Open()
 {
-	m_sName = szVolumeName;
+	ASSERT( ! Name.IsEmpty() );
 
-	HRESULT hr = m_Volume.Create( szVolumeName, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
-	if ( FAILED( hr ) )
+	if ( m_h == NULL )
 	{
-		Log( LOG_WARNING, IDS_VOLUME_MISSING, (LPCTSTR)GetErrorString( hr ) );
-		return false;
+		HRESULT hr = CAtlFile::Create( Name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
+		if ( FAILED( hr ) )
+		{
+			Log( LOG_WARNING, IDS_VOLUME_MISSING, (LPCTSTR)GetErrorString( hr ) );
+			return false;
+		}
 	}
-
 	return true;
 }
 
 bool CDeviceVolume::Lock()
 {
-	if ( ! m_bLocked )
+	if ( Open() )
 	{
-		Log( LOG_ACTION, IDS_VOLUME_LOCK, (LPCTSTR)m_sName );
-
-		DWORD returned;
-		if ( ! DeviceIoControl( m_Volume, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+		if ( ! m_bLocked )
 		{
-			Log( LOG_WARNING, IDS_VOLUME_LOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
-			return false;
+			Log( LOG_ACTION, IDS_VOLUME_LOCK, (LPCTSTR)Name );
+
+			DWORD returned;
+			if ( ! DeviceIoControl( m_h, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+			{
+				Log( LOG_WARNING, IDS_VOLUME_LOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+				return false;
+			}
+
+			m_bLocked = true;
 		}
-
-		m_bLocked = true;
+		return true;
 	}
-
-	return true;
+	return false;
 }
 
 bool CDeviceVolume::Unlock()
 {
-	if ( m_bLocked )
+	if ( m_h != NULL )
 	{
-		Log( LOG_ACTION, IDS_VOLUME_UNLOCK, (LPCTSTR)m_sName );
-
-		DWORD returned;
-		if ( ! DeviceIoControl( m_Volume, FSCTL_UNLOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+		if ( m_bLocked )
 		{
-			Log( LOG_WARNING, IDS_VOLUME_UNLOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
-			return false;
+			Log( LOG_ACTION, IDS_VOLUME_UNLOCK, (LPCTSTR)Name );
+
+			DWORD returned;
+			if ( ! DeviceIoControl( m_h, FSCTL_UNLOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+			{
+				Log( LOG_WARNING, IDS_VOLUME_UNLOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			}
+
+			m_bLocked = false;
 		}
 
-		m_bLocked = false;
-	}
+		CAtlFile::Close();
 
-	return true;
+		return true;
+	}
+	return false;
 }
 
 bool CDeviceVolume::Dismount()
 {
-	Log( LOG_ACTION, IDS_VOLUME_DISMOUNT, (LPCTSTR)m_sName );
-
-	DWORD returned;
-	if ( ! DeviceIoControl( m_Volume, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+	if ( m_h != NULL )
 	{
-		Log( LOG_WARNING, IDS_VOLUME_DISMOUNT_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
-		return false;
-	}
+		Log( LOG_ACTION, IDS_VOLUME_DISMOUNT, (LPCTSTR)Name );
 
-	return true;
+		DWORD returned;
+		if ( ! DeviceIoControl( m_h, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
+		{
+			Log( LOG_WARNING, IDS_VOLUME_DISMOUNT_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			return false;
+		}
+		return true;
+	}
+	return false;
 }

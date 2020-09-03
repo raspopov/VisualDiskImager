@@ -2,26 +2,32 @@
 
 // CDeviceVolume
 
-class CDeviceVolume
+class CDeviceVolume : public CAtlFile
 {
 public:
-	CDeviceVolume() noexcept;
+	CDeviceVolume(LPCTSTR szVolumeName = _T(""));
 	~CDeviceVolume();
 
 	// Open a volume
-	bool Open(LPCTSTR szVolumeName);
+	bool Open();
 
-	// Lock the volume
+	// Open and lock the volume
 	bool Lock();
 
-	// Unlock the volume
+	// Unlock and close the volume
 	bool Unlock();
 
 	// Dismount the volume
 	bool Dismount();
 
+	CString					Name;
+	std::deque< CString >	PathNames;
+
 private:
-	CString		m_sName;
-	CAtlFile	m_Volume;
-	bool		m_bLocked;
+	bool					m_bLocked;
+
+	CDeviceVolume(const CDeviceVolume&) = delete;
+	CDeviceVolume& operator=(const CDeviceVolume&) = delete;
 };
+
+typedef std::deque< std::unique_ptr< CDeviceVolume > > CDeviceVolumes;

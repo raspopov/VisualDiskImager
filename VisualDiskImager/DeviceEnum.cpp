@@ -9,7 +9,7 @@
 #define new DEBUG_NEW
 #endif
 
-void CVisualDiskImagerDlg::EnumDevices(bool bUseDefault)
+void CVisualDiskImagerDlg::EnumDevices()
 {
 	Log( LOG_ACTION, IDS_DEVICE_ENUM );
 
@@ -45,15 +45,18 @@ void CVisualDiskImagerDlg::EnumDevices(bool bUseDefault)
 							break;
 						}
 
-						auto pdevice = std::make_unique< CDevice >();
-						if ( pdevice->Init( disk ) )
+						auto device = std::make_unique< CDevice >();
+						if ( device->Init( disk ) )
 						{
-							Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)pdevice->DeviceID );
-							m_Devices.push_back( std::move( pdevice ) );
+							Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)device->Name );
+
+							device->GetDeviceVolumes();
+
+							m_Devices.push_back( std::move( device ) );
 						}
 						else
 						{
-							Log( LOG_INFO, IDS_DEVICE_SKIP, (LPCTSTR)pdevice->DeviceID );
+							Log( LOG_INFO, IDS_DEVICE_SKIP, (LPCTSTR)device->Name );
 						}
 					}
 				}
@@ -66,112 +69,29 @@ void CVisualDiskImagerDlg::EnumDevices(bool bUseDefault)
 		Log( LOG_WARNING, IDS_WMI_ERROR, (LPCTSTR)GetErrorString( hr) );
 	}
 
-	Log( LOG_ACTION, IDS_ENUM_VOLUME );
-
-	// Windows system directory
-	TCHAR szSystem[ MAX_PATH ];
-	GetSystemDirectory( szSystem, MAX_PATH );
-
-	// Looking for volumes on disk
-	TCHAR szVolumeName[ MAX_PATH ];
-	HANDLE hFindVolume = FindFirstVolume( szVolumeName, MAX_PATH );
-	if ( hFindVolume != INVALID_HANDLE_VALUE )
-	{
-		TCHAR buf[ 1024 ];
-		DWORD returned;
-
-		do
-		{
-			// Volume name without ending slash
-			CString sVolumeNameNoSlash( szVolumeName );
-			sVolumeNameNoSlash.TrimRight( _T('\\') );
-
-			bool bSystem = false;
-
-			// Get disk DOS names
-			CString sVolumePathName;
-			if ( GetVolumePathNamesForVolumeName( szVolumeName, buf, _countof( buf ), &returned ) )
-			{
-				size_t name_len;
-				for ( LPCTSTR name = buf; *name; name += name_len )
-				{
-					name_len = _tcslen( name );
-
-					sVolumePathName += name;
-					sVolumePathName += _T(' ');
-
-					// Check for system volume
-					if ( StrCmpNI( name, szSystem, static_cast< int >( name_len ) ) == 0 )
-					{
-						bSystem = true;
-					}
-				}
-			}
-
-			// Get volume disk hosting information
-			CAtlFile volume;
-			HRESULT hr = volume.Create( sVolumeNameNoSlash, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
-			if ( SUCCEEDED( hr ) )
-			{
-				if ( DeviceIoControl( volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, buf, sizeof( buf ), &returned, nullptr ) )
-				{
-					PVOLUME_DISK_EXTENTS extents = reinterpret_cast< PVOLUME_DISK_EXTENTS >( buf );
-					for ( DWORD extent = 0; extent < extents->NumberOfDiskExtents; ++ extent )
-					{
-						CString device_id;
-						device_id.Format( _T("\\\\.\\PHYSICALDRIVE%u"), extents->Extents[ extent ].DiskNumber );
-
-						if ( sVolumePathName.IsEmpty() )
-						{
-							Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumeNameNoSlash, (LPCTSTR)device_id );
-						}
-						else
-						{
-							Log( LOG_INFO, IDS_VOLUME_INFO_MAP, (LPCTSTR)sVolumeNameNoSlash, (LPCTSTR)device_id, (LPCTSTR)sVolumePathName );
-						}
-
-						// Add volume to owner device
-						for ( auto& device : m_Devices )
-						{
-							if ( StrCmpI( device_id, device->DeviceID ) == 0 )
-							{
-								// Exclude system volume
-								if ( bSystem )
-								{
-									device->Writable = false;
-								}
-
-								device->Volumes.push_back( sVolumeNameNoSlash );
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-		while ( FindNextVolume( hFindVolume, szVolumeName, MAX_PATH ) );
-		FindVolumeClose( hFindVolume );
-	}
+	const CString sRemovable = LoadString( IDS_REMOVABLE );
+	const CString sFixed = LoadString( IDS_FIXED );
+	const CString sNotRecommended = LoadString( IDS_NOT_RECOMMENDED );
 
 	// Fill interface list
-	const CString sDefDeviceID = bUseDefault ? theApp.GetProfileString( REG_SETTINGS, REG_DEVICE ) : _T("");
-	for ( const auto& pdevice : m_Devices )
+	const CString sDefDeviceID = theApp.GetProfileString( REG_SETTINGS, REG_DEVICE );
+	for ( const auto& device : m_Devices )
 	{
 		CString sDevice;
-		sDevice.Format( _T("%s \"%s\" (%s) %s %s%s"),
-			(LPCTSTR)pdevice->DeviceID,
-			(LPCTSTR)pdevice->Model,
-			(LPCTSTR)FormatByteSize( pdevice->Size ),
-			(LPCTSTR)pdevice->Type,
-			pdevice->Removable ? _T("Removable") : _T("Fixed"),
-			pdevice->Writable ? _T("") : _T(" (NOT RECOMMENDED)") );
+		sDevice.Format( _T("%s \"%s\" (%s) %s %s %s"),
+			(LPCTSTR)device->Name,
+			(LPCTSTR)device->Model,
+			(LPCTSTR)FormatByteSize( device->DiskSize ),
+			(LPCTSTR)device->Type,
+			( device->Removable ? (LPCTSTR)sRemovable : (LPCTSTR)sFixed ),
+			( ( device->Writable && ! device->System ) ? _T("") : (LPCTSTR)sNotRecommended ) );
 
 		const int nIndex = m_wndDevices.AddString( sDevice );
 		ASSERT( nIndex != CB_ERR );
-		m_wndDevices.SetItemDataPtr( nIndex, pdevice.get() );
+		m_wndDevices.SetItemDataPtr( nIndex, device.get() );
 
 		// Select default one
-		if ( StrCmpI( sDefDeviceID, pdevice->DeviceID ) == 0 )
+		if ( StrCmpI( sDefDeviceID, device->Name ) == 0 )
 		{
 			m_wndDevices.SetCurSel( nIndex );
 		}

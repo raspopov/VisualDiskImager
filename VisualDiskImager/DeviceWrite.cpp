@@ -10,19 +10,17 @@
 #define new DEBUG_NEW
 #endif
 
-void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, CDevice* pdevice)
+// CVisualDiskImagerDlg
+
+void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify)
 {
-	pThis->WriteDisk( szFilename, pdevice );
+	pThis->WriteDisk( szFilename, szDevice, bWrite, bVerify );
 
 	pThis->PostMessage( WM_DONE );
 }
 
-void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, CDevice* pdevice)
+void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify)
 {
-	const DWORD buf_size = 64 * 1024;
-	CAutoVectorPtr< char > buf( new char[ buf_size ] );
-	DWORD returned;
-
 	Log( LOG_ACTION, IDS_FILE, szFilename );
 
 	// Check file type
@@ -60,100 +58,169 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, CDevice* pdevice)
 		Log( LOG_ERROR, IDS_FILE_ZERO_SIZE );
 		return;
 	}
-	Log( LOG_INFO, IDS_FILE_SIZE, (LPCTSTR)FormatByteSize( file_size ), file_size, (LPCTSTR)FormatByteSize( 0 ).Trim( _T(" 0") ) );
-	if ( file_size % pdevice->BytesPerSector != 0 )
-	{
-		Log( LOG_WARNING, IDS_FILE_SECTOR_SIZE, (LPCTSTR)FormatByteSize( pdevice->BytesPerSector ) );
-	}
+	Log( LOG_INFO, IDS_FILE_SIZE, (LPCTSTR)FormatByteSizeEx( file_size ) );
 
-	// Open device volumes
-	std::deque< std::unique_ptr< CDeviceVolume > > volumes;
-	for ( const auto& volume_name : pdevice->Volumes )
+	CDevice device( szDevice );
+	device.GetDeviceVolumes();
+
+	if ( bWrite )
 	{
-		auto pvolume = std::make_unique< CDeviceVolume >();
-		if ( pvolume->Open( volume_name ) )
+		// Lock device volumes
+		for ( const auto& volume : device.Volumes )
 		{
-			volumes.push_back( std::move( pvolume ) );
+			volume->Lock();
+		}
+
+		// Unmount device volumes
+		for ( const auto& volume : device.Volumes )
+		{
+			volume->Dismount();
 		}
 	}
 
-	// Lock device volumes
-	for ( const auto& volume : volumes )
-	{
-		volume->Lock();
-	}
-
-	// Unmount device volumes
-	for ( const auto& volume : volumes )
-	{
-		volume->Dismount();
-	}
-
 	// Open disk
-	Log( LOG_ACTION, IDS_DEVICE, (LPCTSTR)pdevice->DeviceID );
-	CAtlFile disk;
-	hr = disk.Create( pdevice->DeviceID, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
-	if ( FAILED( hr ) )
+	Log( LOG_ACTION, IDS_DEVICE, szDevice );
+	if ( ! device.Open( bWrite ) )
 	{
-		Log( LOG_ERROR, IDS_DEVICE_MISSING, (LPCTSTR)GetErrorString( hr ) );
 		return;
 	}
 
 	// Check device size
-	Log( LOG_INFO, IDS_DEVICE_SIZE, (LPCTSTR)FormatByteSize( pdevice->Size ), pdevice->Size, (LPCTSTR)FormatByteSize( 0 ).Trim( _T(" 0") ) );
-	if ( pdevice->Size < file_size )
+	Log( LOG_INFO, IDS_DEVICE_SIZE, (LPCTSTR)FormatByteSizeEx( device.DiskSize ) );
+	if ( device.DiskSize < file_size )
 	{
 		Log( LOG_WARNING, IDS_DEVICE_SIZE_MISMATCH );
 	}
+	if ( file_size % device.BytesPerSector != 0 )
+	{
+		Log( LOG_WARNING, IDS_FILE_SECTOR_SIZE, (LPCTSTR)FormatByteSize( device.BytesPerSector ) );
+	}
+
+	const DWORD buf_size = 1024 * 1024; // 1MB
+	CVirtualBuffer file_buf( buf_size );
+	ULONGLONG leftover = 0;
 
 	// Write to disk
-	Log( LOG_ACTION, IDS_WRITING );
-	ULONGLONG leftover = file_size;
-	while ( leftover && ! m_bCancel )
+	if ( bWrite && ! m_bCancel )
 	{
-		const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
-		const DWORD to_write = ( to_read / pdevice->BytesPerSector + ( ( to_read % pdevice->BytesPerSector ) ? 1 : 0 ) ) * pdevice->BytesPerSector;
+		Log( LOG_ACTION, IDS_WRITING );
 
-		memset( buf, 0, to_write );
-
-		hr = file.Read( buf, to_read );
-		if ( FAILED( hr ) )
+		leftover = file_size;
+		while ( leftover && ! m_bCancel )
 		{
-			Log( LOG_ERROR, IDS_FILE_ERROR, (LPCTSTR)GetErrorString( hr ) );
-			break;
+			const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
+			const DWORD to_write = ( to_read / device.BytesPerSector + ( ( to_read % device.BytesPerSector ) ? 1 : 0 ) ) * device.BytesPerSector;
+
+			memset( file_buf, 0, to_write );
+
+			hr = file.Read( file_buf, to_read );
+			if ( FAILED( hr ) )
+			{
+				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				break;
+			}
+
+			DWORD written = 0;
+			hr = device.Write( file_buf, to_write, &written );
+			if ( FAILED( hr ) || written != to_write )
+			{
+				Log( LOG_ERROR, IDS_DEVICE_WRITE_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				break;
+			}
+
+			leftover -= to_read;
+
+			m_wndProgress.PostMessage( PBM_SETPOS, (int)( ( ( file_size - leftover ) * 100 ) / file_size ) );
 		}
 
-		DWORD written = 0;
-		hr = disk.Write( buf, to_write, &written );
-		if ( FAILED( hr ) || written != to_write )
+		device.Flush();
+
+		if ( leftover == 0 )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_ERROR, (LPCTSTR)GetErrorString( hr ) );
-			break;
+			// Success
+			Log( LOG_INFO, IDS_WRITE_OK );
+		}
+		else
+		{
+			// Errors
+			Log( LOG_WARNING, IDS_WRITE_LEFT, (LPCTSTR)FormatByteSize( file_size - leftover ), (LPCTSTR)FormatByteSize( file_size ) );
+		}
+	}
+
+	if ( leftover == 0 && bVerify && ! m_bCancel )
+	{
+		Log( LOG_ACTION, IDS_VERIFYING );
+
+		hr = file.Seek( 0, FILE_BEGIN );
+		if ( SUCCEEDED( hr ) )
+		{
+			hr = device.Seek( 0, FILE_BEGIN );
+			if ( SUCCEEDED( hr ) )
+			{
+				CVirtualBuffer device_buf( buf_size );
+				leftover = file_size;
+				while ( leftover && ! m_bCancel )
+				{
+					const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
+					const DWORD to_write = ( to_read / device.BytesPerSector + ( ( to_read % device.BytesPerSector ) ? 1 : 0 ) ) * device.BytesPerSector;
+
+					memset( file_buf, 0, to_write );
+
+					hr = file.Read( file_buf, to_read );
+					if ( FAILED( hr ) )
+					{
+						Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+						break;
+					}
+
+					memset( device_buf, 0, to_write );
+
+					hr = device.Read( device_buf, to_write );
+					if ( FAILED( hr ) )
+					{
+						Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+						break;
+					}
+
+					if ( memcmp( file_buf, device_buf, to_read ) != 0 )
+					{
+						Log( LOG_ERROR, IDS_VERIFY_ERROR );
+						break;
+					}
+
+					leftover -= to_read;
+
+					m_wndProgress.PostMessage( PBM_SETPOS, (int)( ( ( file_size - leftover ) * 100 ) / file_size ) );
+				}
+
+				if ( leftover == 0 )
+				{
+					// Success
+					Log( LOG_INFO, IDS_VERIFY_OK );
+				}
+			}
+			else
+			{
+				Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+			}
+		}
+		else
+		{
+			Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+		}
+	}
+
+	if ( bWrite )
+	{
+		// Unlock device volumes
+		for ( const auto& volume : device.Volumes )
+		{
+			volume->Unlock();
 		}
 
-		leftover -= to_read;
-
-		m_wndProgress.PostMessage( PBM_SETPOS, (int)( ( ( file_size - leftover ) * 100 ) / file_size ) );
+		// Update device
+		device.Update();
 	}
 
-	if ( leftover == 0 )
-	{
-		// Success
-		Log( LOG_INFO, IDS_WRITE_OK );
-	}
-	else
-	{
-		// Errors
-		Log( LOG_WARNING, IDS_WRITE_LEFT, (LPCTSTR)FormatByteSize( file_size - leftover ), (LPCTSTR)FormatByteSize( file_size ) );
-	}
-
-	// Unlock device volumes
-	volumes.clear();
-
-	// Update disk
-	Log( LOG_ACTION, IDS_DEVICE_UPDATE );
-	if ( ! DeviceIoControl( disk, IOCTL_DISK_UPDATE_PROPERTIES, nullptr, 0, nullptr, 0, &returned, nullptr ) )
-	{
-		Log( LOG_ERROR, IDS_DEVICE_UPDATE_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
-	}
+	Log( LOG_INFO, IDS_DONE );
 }

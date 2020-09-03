@@ -20,18 +20,21 @@ protected:
 	HICON				m_hIcon;
 	CImageList			m_Images;
 
-	CButton				m_wndStart;		// "Write"/"Cancel" button
-	CButton				m_wndRefresh;	// "Refresh" button
+	CButton				m_wndWriteButton;	// "Write"/"Stop" button
+	CButton				m_wndVerifyButton;	// "Verify"/"Stop" button
+	CButton				m_wndRefresh;		// "Refresh" button
 	CMFCEditBrowseCtrl	m_wndBrowse;
-	CComboBox			m_wndDevices;	// Enumerated devices list
+	CComboBox			m_wndDevices;		// Enumerated devices list
+	CButton				m_wndVerifyCheckbox;
 	CProgressCtrl		m_wndProgress;
 	CListCtrl			m_wndLog;
+
 	std::thread			m_Thread;
 	volatile bool		m_bCancel;
+	CDevices			m_Devices;
 
-	std::deque< std::unique_ptr< CDevice > > m_Devices;
-
-	void Cancel();
+	void Start(bool bWrite);
+	void Stop();
 
 	void UpdateSize();
 
@@ -41,16 +44,14 @@ protected:
 	// Set disk image file
 	void SetFile(LPCTSTR szFilename = nullptr);
 
-	// Enumerate disk volumes (bUseDefault = true - load default from registry)
-	void EnumDevices(bool bUseDefault);
+	// Enumerate disk volumes
+	void EnumDevices();
 
 	// Return selected device
 	CDevice* GetSelectedDevice() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, CDevice* pdevice);
-	void WriteDisk(LPCTSTR szFilename, CDevice* pdevice);
-
-	void UnmountDisk(LPCTSTR szDeviceID);
+	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify);
+	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify);
 
 	// Clear the log (with animation)
 	void ClearLog();
@@ -70,6 +71,7 @@ protected:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg LRESULT OnLog(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnDone(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnBnClickedVerifyButton();
 
 	DECLARE_MESSAGE_MAP()
 };

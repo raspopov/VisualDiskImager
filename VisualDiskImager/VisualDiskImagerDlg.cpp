@@ -26,8 +26,10 @@ void CVisualDiskImagerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_DEVICES, m_wndDevices);
 	DDX_Control(pDX, IDC_PROGRESS, m_wndProgress);
 	DDX_Control(pDX, IDC_LOG, m_wndLog);
-	DDX_Control(pDX, IDOK, m_wndStart);
+	DDX_Control(pDX, IDOK, m_wndWriteButton);
 	DDX_Control(pDX, IDC_REFRESH, m_wndRefresh);
+	DDX_Control(pDX, IDC_VERIFY, m_wndVerifyCheckbox);
+	DDX_Control(pDX, IDC_VERIFY_BUTTON, m_wndVerifyButton);
 }
 
 BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
@@ -41,6 +43,7 @@ BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
 	ON_WM_SIZE()
 	ON_MESSAGE( WM_LOG, &CVisualDiskImagerDlg::OnLog )
 	ON_MESSAGE( WM_DONE, &CVisualDiskImagerDlg::OnDone )
+	ON_BN_CLICKED(IDC_VERIFY_BUTTON, &CVisualDiskImagerDlg::OnBnClickedVerifyButton)
 END_MESSAGE_MAP()
 
 // CVisualDiskImagerDlg message handlers
@@ -100,10 +103,9 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ), OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST );
 	m_wndBrowse.SetCueBanner( LoadString( IDS_FILE_SELECT )  );
 
-	m_wndProgress.ShowWindow( SW_HIDE );
 	m_wndProgress.SetRange32( 0, 100 );
 
-	m_wndStart.SetWindowText( LoadString( IDS_WRITE ) );
+	m_wndVerifyCheckbox.SetCheck( theApp.GetProfileInt( REG_SETTINGS, REG_VERIFY, TRUE ) ? BST_CHECKED : BST_UNCHECKED );
 
 	DragAcceptFiles();
 
@@ -119,7 +121,9 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 		SetFile( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	}
 
-	EnumDevices( bLoad );
+	OnDone( 0, 0 );
+
+	OnBnClickedRefresh();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -155,44 +159,74 @@ void CVisualDiskImagerDlg::OnOK()
 {
 	if ( m_Thread.joinable() )
 	{
-		// "Cancel" button pressed
-
+		// "Stop" button pressed
 		if ( AfxMessageBox( IDS_CANCEL_ASK, MB_ICONEXCLAMATION | MB_YESNO ) == IDYES )
 		{
 			m_bCancel = true;
 
-			m_wndStart.EnableWindow( FALSE );
+			m_wndWriteButton.EnableWindow( FALSE );
 		}
 	}
 	else
 	{
 		// "Write" button pressed
+		if ( AfxMessageBox( IDS_WRITE_PROMPT, MB_ICONEXCLAMATION | MB_YESNO ) == IDYES )
+		{
+			Start( true );
+		}
+	}
+}
+
+void CVisualDiskImagerDlg::OnBnClickedVerifyButton()
+{
+	if ( m_Thread.joinable() )
+	{
+		// "Stop" button pressed
+		m_bCancel = true;
+
+		m_wndVerifyButton.EnableWindow( FALSE );
+	}
+	else
+	{
+		// "Verify" button pressed
+		Start( false );
+	}
+}
+
+void CVisualDiskImagerDlg::Start(bool bWrite)
+{
+	if ( auto pdevice = GetSelectedDevice() )
+	{
+		CWaitCursor wc;
 
 		CString strFilename;
 		m_wndBrowse.GetWindowText( strFilename );
 
-		if ( auto pdevice = GetSelectedDevice() )
+		ClearLog();
+
+		if ( bWrite )
 		{
-			if ( AfxMessageBox( IDS_WRITE_PROMPT, MB_ICONEXCLAMATION | MB_YESNO ) == IDYES )
-			{
-				CWaitCursor wc;
-
-				ClearLog();
-
-				m_wndStart.SetWindowText( LoadString( IDS_CANCEL ) );
-				m_wndRefresh.EnableWindow( FALSE );
-				m_wndBrowse.EnableWindow( FALSE );
-				m_wndDevices.EnableWindow( FALSE );
-
-				m_wndProgress.SetPos( 0 );
-				m_wndProgress.ShowWindow( SW_SHOW );
-
-				UpdateWindow();
-
-				m_bCancel = false;
-				m_Thread = std::thread( &CVisualDiskImagerDlg::WriteDiskThread, this, strFilename, pdevice );
-			}
+			m_wndWriteButton.SetWindowText( LoadString( IDS_CANCEL ) );
+			m_wndVerifyButton.EnableWindow( FALSE );
 		}
+		else
+		{
+			m_wndWriteButton.EnableWindow( FALSE );
+			m_wndVerifyButton.SetWindowText( LoadString( IDS_CANCEL ) );
+		}
+		m_wndRefresh.EnableWindow( FALSE );
+		m_wndBrowse.EnableWindow( FALSE );
+		m_wndDevices.EnableWindow( FALSE );
+		m_wndVerifyCheckbox.EnableWindow( FALSE );
+
+		m_wndProgress.SetPos( 0 );
+		m_wndProgress.ShowWindow( SW_SHOW );
+
+		UpdateWindow();
+
+		m_bCancel = false;
+		m_Thread = std::thread( &CVisualDiskImagerDlg::WriteDiskThread, this, strFilename, pdevice->Name,
+			bWrite, ! bWrite || ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) );
 	}
 }
 
@@ -208,7 +242,7 @@ void CVisualDiskImagerDlg::OnCancel()
 		CWaitCursor wc;
 
 		// Wait till write end
-		Cancel();
+		Stop();
 
 		// Retry exit action
 		PostMessage( WM_SYSCOMMAND, SC_CLOSE );
@@ -223,15 +257,18 @@ LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
 	CWaitCursor wc;
 
-	Cancel();
+	Stop();
 
-	EnumDevices( true );
+	m_wndWriteButton.SetWindowText( LoadString( IDS_WRITE ) );
+	m_wndWriteButton.EnableWindow( TRUE );
 
-	m_wndStart.SetWindowText( LoadString( IDS_WRITE ) );
-	m_wndStart.EnableWindow( TRUE );
+	m_wndVerifyButton.SetWindowText( LoadString( IDS_VERIFY ) );
+	m_wndVerifyButton.EnableWindow( TRUE );
+
 	m_wndRefresh.EnableWindow( TRUE );
 	m_wndBrowse.EnableWindow( TRUE );
 	m_wndDevices.EnableWindow( TRUE );
+	m_wndVerifyCheckbox.EnableWindow( TRUE );
 
 	m_wndProgress.ShowWindow( SW_HIDE );
 
@@ -240,7 +277,7 @@ LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
 	return 0;
 }
 
-void CVisualDiskImagerDlg::Cancel()
+void CVisualDiskImagerDlg::Stop()
 {
 	if ( m_Thread.joinable() )
 	{
@@ -263,9 +300,12 @@ void CVisualDiskImagerDlg::Cancel()
 
 void CVisualDiskImagerDlg::OnDestroy()
 {
-	Cancel();
+	Stop();
 
 	ClearDevices();
+
+	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
+
 
 	CDialogExSized::OnDestroy();
 }
@@ -313,7 +353,7 @@ void CVisualDiskImagerDlg::OnBnClickedRefresh()
 
 	ClearLog();
 
-	EnumDevices( true );
+	EnumDevices();
 }
 
 void CVisualDiskImagerDlg::ClearDevices()
@@ -339,7 +379,7 @@ void CVisualDiskImagerDlg::OnCbnSelchangeDevices()
 	auto pdevice = GetSelectedDevice();
 	if ( pdevice )
 	{
-		theApp.WriteProfileString( REG_SETTINGS, REG_DEVICE, pdevice->DeviceID );
+		theApp.WriteProfileString( REG_SETTINGS, REG_DEVICE, pdevice->Name );
 	}
 }
 
@@ -366,8 +406,8 @@ LRESULT CVisualDiskImagerDlg::OnLog(WPARAM wParam, LPARAM lParam)
 void CVisualDiskImagerDlg::UpdateSize()
 {
 	CRect rc;
-	m_wndLog.GetClientRect( &rc );
-	m_wndLog.SetColumnWidth( 0, rc.Width() - GetSystemMetrics( SM_CXVSCROLL ) - 2 * GetSystemMetrics( SM_CXBORDER ) );
+	m_wndLog.GetWindowRect( &rc );
+	m_wndLog.SetColumnWidth( 0, rc.Width() - 8 - GetSystemMetrics( SM_CXVSCROLL ) - 2 * GetSystemMetrics( SM_CXBORDER ) );
 }
 
 void CVisualDiskImagerDlg::OnSize(UINT nType, int cx, int cy)

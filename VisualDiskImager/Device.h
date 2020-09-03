@@ -1,26 +1,43 @@
 #pragma once
 
+#include "DeviceVolume.h"
+
 // CDevice
 
-class CDevice
+class CDevice : public CAtlFile
 {
 public:
-	CDevice() noexcept;
+	CDevice(LPCTSTR szDeviceID = _T(""));
+	~CDevice();
 
 	// Initialize device information from WMI
 	bool Init(IWbemClassObject* disk);
 
-	inline operator bool() const
-	{
-		return ( DeviceID.IsEmpty() == FALSE );
-	}
+	// Find all volumes of this device (fills Volumes member)
+	void GetDeviceVolumes();
 
-	CString		DeviceID;
-	CString		Model;
-	CString		Type;
-	ULONGLONG	Size;
-	DWORD		BytesPerSector;
-	bool		Writable;
-	bool		Removable;
-	std::deque< CString >	Volumes;
+	// Open device
+	bool Open(bool bWrite);
+
+	// Update device properties
+	bool Update();
+
+	// Eject device
+	bool Eject();
+
+	CString			Name;
+	CString			Model;
+	CString			Type;
+	ULONGLONG		DiskSize;
+	DWORD			BytesPerSector;
+	bool			Writable;
+	bool			Removable;
+	bool			System;
+	CDeviceVolumes	Volumes;
+
+private:
+	CDevice(const CDevice&) = delete;
+	CDevice& operator=(const CDevice&) = delete;
 };
+
+typedef std::deque< std::unique_ptr< CDevice > > CDevices;

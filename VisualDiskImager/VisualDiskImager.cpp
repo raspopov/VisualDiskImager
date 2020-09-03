@@ -55,6 +55,16 @@ CString FormatByteSize(LONGLONG nSize)
 	return str;
 }
 
+CString FormatByteSizeEx(LONGLONG nSize)
+{
+	CString str = FormatByteSize( nSize );
+	if ( nSize >= 1024 )
+	{
+		str.AppendFormat( _T(" (%I64u %s)"), nSize, (LPCTSTR)FormatByteSize( 0 ).Trim( _T(" 0") ) );
+	}
+	return str;
+}
+
 CString GetErrorString(DWORD error)
 {
 	CString str;
