@@ -11,6 +11,8 @@
 
 // CVisualDiskImagerDlg dialog
 
+IMPLEMENT_DYNAMIC(CVisualDiskImagerDlg, CDialogExSized)
+
 CVisualDiskImagerDlg::CVisualDiskImagerDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogExSized( IDD, pParent )
 	, m_hIcon		( nullptr )

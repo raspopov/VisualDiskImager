@@ -42,18 +42,24 @@ void CDialogExSized::ReloadLayout()
 
 void CDialogExSized::SaveWindowPlacement()
 {
+	CString sClassName( GetRuntimeClass()->m_lpszClassName );
+	ASSERT( sClassName != ("CDialogExSized") ); // Use DECLARE_DYNAMIC() in the child class.
+
 	WINDOWPLACEMENT wp = { sizeof( WINDOWPLACEMENT ) };
 	if ( GetWindowPlacement( &wp ) )
 	{
-		AfxGetApp()->WriteProfileBinary( _T("Window"), CString( GetRuntimeClass()->m_lpszClassName ) + _T("_position"), (LPBYTE)&wp, sizeof( WINDOWPLACEMENT ) );
+		AfxGetApp()->WriteProfileBinary( _T("Window"), sClassName + _T("_position"), (LPBYTE)&wp, sizeof( WINDOWPLACEMENT ) );
 	}
 }
 
 void CDialogExSized::RestoreWindowPlacement()
 {
+	CString sClassName( GetRuntimeClass()->m_lpszClassName );
+	ASSERT( sClassName != ("CDialogExSized") ); // Use DECLARE_DYNAMIC() in the child class.
+
 	CAutoVectorPtr< WINDOWPLACEMENT >wp;
 	UINT wp_size = 0;
-	if ( AfxGetApp()->GetProfileBinary( _T("Window"), CString( GetRuntimeClass()->m_lpszClassName ) + _T("_position"), (LPBYTE*)&wp, &wp_size ) &&
+	if ( AfxGetApp()->GetProfileBinary( _T("Window"), sClassName + _T("_position"), (LPBYTE*)&wp, &wp_size ) &&
 			wp_size == sizeof( WINDOWPLACEMENT ) )
 	{
 		SetWindowPlacement( wp );

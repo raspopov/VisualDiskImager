@@ -11,6 +11,8 @@
 
 class CVisualDiskImagerDlg : public CDialogExSized
 {
+	DECLARE_DYNAMIC(CVisualDiskImagerDlg)
+
 public:
 	CVisualDiskImagerDlg(CWnd* pParent = nullptr);
 
