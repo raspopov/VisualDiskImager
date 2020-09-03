@@ -103,7 +103,7 @@ BOOL CVisualDiskImagerApp::InitInstance()
 	const INITCOMMONCONTROLSEX InitCtrls = { sizeof( InitCtrls ), ICC_WIN95_CLASSES | ICC_USEREX_CLASSES };
 	InitCommonControlsEx( &InitCtrls );
 
-	VERIFY( SUCCEEDED( CoInitializeEx( nullptr, COINIT_MULTITHREADED ) ) );
+	VERIFY( SUCCEEDED( CoInitializeEx( nullptr, COINIT_APARTMENTTHREADED ) ) );
 
 	VERIFY( SUCCEEDED( CoInitializeSecurity( nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
 		nullptr, EOAC_NONE, nullptr ) ) );

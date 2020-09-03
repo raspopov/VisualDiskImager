@@ -102,6 +102,7 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ), OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST );
 	m_wndBrowse.SetCueBanner( LoadString( IDS_FILE_SELECT )  );
+	SHAutoComplete( m_wndBrowse.GetSafeHwnd(), SHACF_FILESYS_ONLY | SHACF_URLHISTORY | SHACF_URLMRU | SHACF_USETAB );
 
 	m_wndProgress.SetRange32( 0, 100 );
 
