@@ -25,15 +25,14 @@ public:
 	// Eject device
 	bool Eject();
 
-	CString			Name;
-	CString			Model;
-	CString			Type;
-	ULONGLONG		DiskSize;
-	DWORD			BytesPerSector;
-	bool			Writable;
-	bool			Removable;
-	bool			System;
-	CDeviceVolumes	Volumes;
+	CString				Name;
+	CString				Model;
+	CString				Type;
+	DISK_GEOMETRY_EX	Info;
+	bool				Writable;
+	bool				Removable;
+	bool				System;
+	CDeviceVolumes		Volumes;
 
 private:
 	CDevice(const CDevice&) = delete;

@@ -86,14 +86,24 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 	}
 
 	// Check device size
-	Log( LOG_INFO, IDS_DEVICE_SIZE, (LPCTSTR)FormatByteSizeEx( device.DiskSize ) );
-	if ( device.DiskSize < file_size )
+	const ULONGLONG disk_size = device.Info.DiskSize.QuadPart;
+	Log( LOG_INFO, IDS_DEVICE_SIZE, (LPCTSTR)FormatByteSizeEx( disk_size ) );
+	if ( disk_size < file_size )
 	{
-		Log( LOG_WARNING, IDS_DEVICE_SIZE_MISMATCH );
+		if ( disk_size == 0 )
+		{
+			Log( LOG_ERROR, IDS_DEVICE_SIZE_MISMATCH );
+			return;
+		}
+		else
+		{
+			Log( LOG_WARNING, IDS_DEVICE_SIZE_MISMATCH );
+		}
 	}
-	if ( file_size % device.BytesPerSector != 0 )
+	const DWORD bytes_per_sector = device.Info.Geometry.BytesPerSector ? device.Info.Geometry.BytesPerSector : 512;
+	if ( file_size % bytes_per_sector != 0 )
 	{
-		Log( LOG_WARNING, IDS_FILE_SECTOR_SIZE, (LPCTSTR)FormatByteSize( device.BytesPerSector ) );
+		Log( LOG_WARNING, IDS_FILE_SECTOR_SIZE, (LPCTSTR)FormatByteSize( bytes_per_sector ) );
 	}
 
 	const DWORD buf_size = 1024 * 1024; // 1MB
@@ -105,11 +115,11 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 	{
 		Log( LOG_ACTION, IDS_WRITING );
 
-		leftover = file_size;
+		leftover = min( file_size, disk_size );
 		while ( leftover && ! m_bCancel )
 		{
 			const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
-			const DWORD to_write = ( to_read / device.BytesPerSector + ( ( to_read % device.BytesPerSector ) ? 1 : 0 ) ) * device.BytesPerSector;
+			const DWORD to_write = ( to_read / bytes_per_sector + ( ( to_read % bytes_per_sector ) ? 1 : 0 ) ) * bytes_per_sector;
 
 			memset( file_buf, 0, to_write );
 
@@ -158,11 +168,11 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 			if ( SUCCEEDED( hr ) )
 			{
 				CVirtualBuffer device_buf( buf_size );
-				leftover = file_size;
+				leftover = min( file_size, disk_size );
 				while ( leftover && ! m_bCancel )
 				{
 					const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
-					const DWORD to_write = ( to_read / device.BytesPerSector + ( ( to_read % device.BytesPerSector ) ? 1 : 0 ) ) * device.BytesPerSector;
+					const DWORD to_write = ( to_read / bytes_per_sector + ( ( to_read % bytes_per_sector ) ? 1 : 0 ) ) * bytes_per_sector;
 
 					memset( file_buf, 0, to_write );
 

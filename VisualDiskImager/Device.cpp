@@ -12,12 +12,11 @@
 // CDevice
 
 CDevice::CDevice(LPCTSTR szDeviceID)
-	: Name			( szDeviceID )
-	, DiskSize		( 0 )
-	, BytesPerSector( 0 )
-	, Writable		( false )
-	, System		( false )
-	, Removable		( false )
+	: Name		( szDeviceID )
+	, Info		()
+	, Writable	( false )
+	, System	( false )
+	, Removable	( false )
 {
 }
 
@@ -27,13 +26,10 @@ CDevice::~CDevice()
 
 bool CDevice::Init(IWbemClassObject* disk)
 {
-	CComVariant id, model, type, size, sector, capabilities;
+	CComVariant id, model, type, capabilities;
 	if ( SUCCEEDED( disk->Get( L"DeviceID", 0, &id, 0, 0 ) ) &&
 		 SUCCEEDED( disk->Get( L"Model", 0, &model, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"BytesPerSector", 0, &sector, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"Size", 0, &size, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"Capabilities", 0, &capabilities, 0, 0 ) ) )
+		 SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, 0, 0 ) ) )
 	{
 		VERIFY( SUCCEEDED( id.ChangeType( VT_BSTR ) ) );
 		Name = id;
@@ -44,39 +40,16 @@ bool CDevice::Init(IWbemClassObject* disk)
 		VERIFY( SUCCEEDED( type.ChangeType( VT_BSTR ) ) );
 		Type = type;
 
-		VERIFY( SUCCEEDED( size.ChangeType( VT_UI8 ) ) );
-		DiskSize = size.ullVal;
-
-		VERIFY( SUCCEEDED( sector.ChangeType( VT_UI4 ) ) );
-		BytesPerSector = sector.ulVal;
-
-		bool removable = false;
-		if ( capabilities.vt == ( VT_ARRAY | VT_I4 ) )
+		if ( Open( false ) )
 		{
-			CComSafeArray< LONG > caps;
-			if ( SUCCEEDED( caps.Attach( capabilities.parray ) ) )
+			Removable = ( Info.Geometry.MediaType != FixedMedia );
+
+			if ( Info.DiskSize.QuadPart == 0 )
 			{
-				const ULONG count = caps.GetCount();
-				for ( ULONG i = 0; i < count; ++i )
-				{
-					switch ( caps.GetAt( i ) )
-					{
-					case 4:
-						Writable = true;
-						break;
-
-					case 7:
-						Removable = true;
-						break;
-					}
-				}
+				Writable = false;
 			}
-			caps.Detach();
-		}
 
-		if ( DiskSize == 0 || BytesPerSector == 0 )
-		{
-			Writable = false;
+			Close();
 		}
 
 		return true;
@@ -194,20 +167,13 @@ bool CDevice::Open(bool bWrite)
 			return false;;
 		}
 
-		char buf [ 256 ] = {};
 		DWORD returned;
-		if ( DeviceIoControl( m_h, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, nullptr, 0, buf, sizeof( buf ), &returned, nullptr ) )
-		{
-			const PDISK_GEOMETRY_EX geo = reinterpret_cast< PDISK_GEOMETRY_EX  >( buf );
-			BytesPerSector = geo->Geometry.BytesPerSector;
-			DiskSize = geo->DiskSize.QuadPart;
-		}
-		else
+		if ( ! DeviceIoControl( m_h, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, nullptr, 0, &Info, sizeof( Info ), &returned, nullptr ) )
 		{
 			Log( LOG_WARNING, IDS_DEVICE_INFO_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
 		}
 
-		if ( DeviceIoControl( m_h, IOCTL_DISK_IS_WRITABLE, nullptr, 0, buf, sizeof( buf ), &returned, nullptr ) )
+		if ( DeviceIoControl( m_h, IOCTL_DISK_IS_WRITABLE, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 		{
 			Writable = true;
 		}

@@ -48,7 +48,18 @@ void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 						auto device = std::make_unique< CDevice >();
 						if ( device->Init( disk ) )
 						{
-							if ( ! bSilent ) Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)device->Name );
+							if ( ! bSilent )
+							{
+								Log( LOG_INFO, IDS_DEVICE_FOUND, (LPCTSTR)device->Name );
+
+								Log( LOG_INFO, IDS_DEVICE_INFO,
+									(LPCTSTR)FormatByteSize( device->Info.DiskSize.QuadPart ),
+									device->Info.DiskSize.QuadPart / ( device->Info.Geometry.BytesPerSector ? device->Info.Geometry.BytesPerSector : 512 ),
+									(LPCTSTR)FormatByteSize( device->Info.Geometry.BytesPerSector ),
+									device->Info.Geometry.Cylinders.QuadPart,
+									device->Info.Geometry.TracksPerCylinder,
+									device->Info.Geometry.SectorsPerTrack );
+							}
 
 							device->GetDeviceVolumes( bSilent );
 
@@ -81,7 +92,7 @@ void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 		sDevice.Format( _T("%s \"%s\" (%s) %s %s %s"),
 			(LPCTSTR)device->Name,
 			(LPCTSTR)device->Model,
-			(LPCTSTR)FormatByteSize( device->DiskSize ),
+			(LPCTSTR)FormatByteSize( device->Info.DiskSize.QuadPart ),
 			(LPCTSTR)device->Type,
 			( device->Removable ? (LPCTSTR)sRemovable : (LPCTSTR)sFixed ),
 			( ( device->Writable && ! device->System ) ? _T("") : (LPCTSTR)sNotRecommended ) );
