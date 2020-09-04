@@ -121,23 +121,21 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 								System = true;
 							}
 
-							if ( volume->PathNames.empty() )
-							{
-								if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)volume->Name );
-							}
-							else
+							if ( ! bSilent )
 							{
 								CString sVolumePathName = volume->Name;
-								sVolumePathName += _T(" -> ");
 								for ( const auto& path : volume->PathNames )
 								{
-									sVolumePathName += path + _T(' ');
+									sVolumePathName += _T(' ');
+									sVolumePathName += path;
 								}
-								if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumePathName );
+								sVolumePathName += _T(" (");
+								sVolumePathName += FormatByteSize( extents->Extents[ extent ].ExtentLength.QuadPart );
+								sVolumePathName += _T(")");
+								Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumePathName );
 							}
 
 							Volumes.emplace_back( std::move( volume ) );
-
 							break;
 						}
 					}
