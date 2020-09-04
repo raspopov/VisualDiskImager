@@ -46,11 +46,12 @@ CString GetErrorString(DWORD error);
 
 // CVirtualBuffer
 
+template< typename T >
 class CVirtualBuffer
 {
 public:
-	inline CVirtualBuffer(SIZE_T size) noexcept
-		: buf( VirtualAlloc( nullptr, size, MEM_COMMIT, PAGE_READWRITE ) )
+	inline CVirtualBuffer(SIZE_T count) noexcept
+		: buf( VirtualAlloc( nullptr, count * sizeof( T ), MEM_COMMIT, PAGE_READWRITE ) )
 	{
 	}
 
@@ -59,9 +60,9 @@ public:
 		VirtualFree( buf, 0, MEM_RELEASE );
 	}
 
-	operator LPVOID() const noexcept
+	operator T*() const noexcept
 	{
-		return buf;
+		return static_cast< T* >( buf );
 	}
 
 private:

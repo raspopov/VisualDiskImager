@@ -12,14 +12,14 @@
 
 // CVisualDiskImagerDlg
 
-void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify)
+void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite)
 {
-	pThis->WriteDisk( szFilename, szDevice, bWrite, bVerify );
+	pThis->WriteDisk( szFilename, szDevice, bWrite, bVerifyAfterWrite );
 
 	pThis->PostMessage( WM_DONE );
 }
 
-void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify)
+void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite)
 {
 	Log( LOG_ACTION, IDS_FILE, szFilename );
 
@@ -38,7 +38,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 
 	// Open file
 	CAtlFile file;
-	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
+	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN );
 	if ( FAILED( hr ) )
 	{
 		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( hr ) );
@@ -101,51 +101,61 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		}
 	}
 	const DWORD bytes_per_sector = device.Info.Geometry.BytesPerSector ? device.Info.Geometry.BytesPerSector : 512;
-	if ( file_size % bytes_per_sector != 0 )
-	{
-		Log( LOG_WARNING, IDS_FILE_SECTOR_SIZE, (LPCTSTR)FormatByteSize( bytes_per_sector ) );
-	}
 
-	const DWORD buf_size = 1024 * 1024; // 1MB
-	CVirtualBuffer file_buf( buf_size );
-	ULONGLONG leftover = 0;
+	const DWORD buf_size = 4 * 1024 * bytes_per_sector;
+	CVirtualBuffer< char > file_buf( buf_size );
+	ULONGLONG pos = 0;
+	const ULONGLONG size = min( file_size, disk_size );
 
-	// Write to disk
 	if ( bWrite && ! m_bCancel )
 	{
+		// Write to disk
 		Log( LOG_ACTION, IDS_WRITING );
 
-		leftover = min( file_size, disk_size );
-		while ( leftover && ! m_bCancel )
+		while ( pos != size && ! m_bCancel )
 		{
-			const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
-			const DWORD to_write = ( to_read / bytes_per_sector + ( ( to_read % bytes_per_sector ) ? 1 : 0 ) ) * bytes_per_sector;
+			const DWORD to_read = (DWORD)min( size - pos, buf_size );
+			DWORD to_write = to_read;
+			if ( to_read % bytes_per_sector != 0 )
+			{
+				to_write = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
 
-			memset( file_buf, 0, to_write );
+				// Read incomplete sector from device
+				const DWORD last_pos = ( to_read / bytes_per_sector ) * bytes_per_sector;
+				if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
+					 FAILED( hr = device.Read( static_cast< char* >( file_buf ) + last_pos, bytes_per_sector ) ) )
+				{
+					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					break;
+				}
+			}
 
-			hr = file.Read( file_buf, to_read );
-			if ( FAILED( hr ) )
+			if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) ||
+				 FAILED( hr = file.Read( file_buf, to_read ) ) )
 			{
 				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
 				break;
 			}
 
 			DWORD written = 0;
-			hr = device.Write( file_buf, to_write, &written );
-			if ( FAILED( hr ) || written != to_write )
+			if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
+				 FAILED( hr = device.Write( file_buf, to_write, &written ) ) ||
+				 written != to_write )
 			{
+				pos += written;
+
 				Log( LOG_ERROR, IDS_DEVICE_WRITE_ERROR, (LPCTSTR)GetErrorString( hr ) );
 				break;
 			}
 
-			leftover -= to_read;
+			pos += to_read;
 
-			m_wndProgress.PostMessage( PBM_SETPOS, (int)( ( ( file_size - leftover ) * 100 ) / file_size ) );
+			m_nProgress = (int)( ( pos * 100 ) / file_size );
 		}
 
 		device.Flush();
 
-		if ( leftover == 0 )
+		if ( pos == size )
 		{
 			// Success
 			Log( LOG_INFO, IDS_WRITE_OK );
@@ -153,70 +163,61 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		else
 		{
 			// Errors
-			Log( LOG_WARNING, IDS_WRITE_LEFT, (LPCTSTR)FormatByteSize( file_size - leftover ), (LPCTSTR)FormatByteSize( file_size ) );
+			Log( LOG_WARNING, IDS_WRITE_ERROR, (LPCTSTR)FormatByteSize( pos ) );
 		}
 	}
 
-	if ( leftover == 0 && bVerify && ! m_bCancel )
+	if ( ( ! bWrite || ( pos == size && bVerifyAfterWrite ) ) && ! m_bCancel )
 	{
+		// Verify disk
 		Log( LOG_ACTION, IDS_VERIFYING );
 
-		hr = file.Seek( 0, FILE_BEGIN );
-		if ( SUCCEEDED( hr ) )
+		CVirtualBuffer< char > device_buf( buf_size );
+		pos = 0;
+		while ( pos != size && ! m_bCancel )
 		{
-			hr = device.Seek( 0, FILE_BEGIN );
-			if ( SUCCEEDED( hr ) )
+			const DWORD to_read = (DWORD)min( size - pos, buf_size );
+			DWORD to_verify = to_read;
+			if ( to_read % bytes_per_sector != 0 )
 			{
-				CVirtualBuffer device_buf( buf_size );
-				leftover = min( file_size, disk_size );
-				while ( leftover && ! m_bCancel )
-				{
-					const DWORD to_read = ( leftover > buf_size ) ? buf_size : (DWORD)leftover;
-					const DWORD to_write = ( to_read / bytes_per_sector + ( ( to_read % bytes_per_sector ) ? 1 : 0 ) ) * bytes_per_sector;
-
-					memset( file_buf, 0, to_write );
-
-					hr = file.Read( file_buf, to_read );
-					if ( FAILED( hr ) )
-					{
-						Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
-						break;
-					}
-
-					memset( device_buf, 0, to_write );
-
-					hr = device.Read( device_buf, to_write );
-					if ( FAILED( hr ) )
-					{
-						Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
-						break;
-					}
-
-					if ( memcmp( file_buf, device_buf, to_read ) != 0 )
-					{
-						Log( LOG_ERROR, IDS_VERIFY_ERROR );
-						break;
-					}
-
-					leftover -= to_read;
-
-					m_wndProgress.PostMessage( PBM_SETPOS, (int)( ( ( file_size - leftover ) * 100 ) / file_size ) );
-				}
-
-				if ( leftover == 0 )
-				{
-					// Success
-					Log( LOG_INFO, IDS_VERIFY_OK );
-				}
+				to_verify = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
 			}
-			else
+
+			if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) ||
+				 FAILED( hr = file.Read( file_buf, to_read ) ) )
+			{
+				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				break;
+			}
+
+			if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
+				 FAILED( hr = device.Read( device_buf, to_verify ) ) )
 			{
 				Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				break;
 			}
+
+			DWORD count = to_read;
+			for ( char *p1 = file_buf, *p2 = device_buf; count; --count )
+			{
+				if ( *p1++ != *p2++ )
+					break;
+			}
+			if ( count )
+			{
+				Log( LOG_ERROR, IDS_VERIFY_ERROR, pos + to_read - count );
+				break;
+			}
+
+			pos += to_read;
+
+			m_nProgress = (int)( ( pos * 100 ) / file_size );
 		}
-		else
+
+		if ( pos == size )
 		{
-			Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+			// Success
+			Log( LOG_INFO, IDS_VERIFY_OK );
 		}
 	}
 

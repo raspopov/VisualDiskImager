@@ -17,6 +17,7 @@ CVisualDiskImagerDlg::CVisualDiskImagerDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogExSized( IDD, pParent )
 	, m_hIcon		( nullptr )
 	, m_bCancel		( false )
+	, m_nProgress	( -1 )
 {
 }
 
@@ -48,6 +49,8 @@ BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
 	ON_MESSAGE( WM_ENUM, &CVisualDiskImagerDlg::OnEnum )
 	ON_BN_CLICKED(IDC_VERIFY_BUTTON, &CVisualDiskImagerDlg::OnBnClickedVerifyButton)
 	ON_MESSAGE( WM_DEVICECHANGE, &CVisualDiskImagerDlg::OnDeviceChange )
+	ON_NOTIFY(LVN_KEYDOWN, IDC_LOG, &CVisualDiskImagerDlg::OnLvnKeydownLog)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 // CVisualDiskImagerDlg message handlers
@@ -106,6 +109,7 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ), OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST );
 	m_wndBrowse.SetCueBanner( LoadString( IDS_FILE_SELECT )  );
+	m_wndBrowse.SetWindowText( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	SHAutoComplete( m_wndBrowse.GetSafeHwnd(), SHACF_FILESYS_ONLY | SHACF_URLHISTORY | SHACF_URLMRU | SHACF_USETAB );
 
 	m_wndProgress.SetRange32( 0, 100 );
@@ -121,16 +125,30 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	UpdateSize();
 
-	if ( bLoad )
-	{
-		SetFile( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
-	}
+	SetTimer( 1, 250, nullptr );
 
 	PostMessage( WM_DONE );
 
 	PostMessage( WM_ENUM );
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+void CVisualDiskImagerDlg::OnDestroy()
+{
+	Stop();
+
+	ClearDevices();
+
+	CString strFilename;
+	m_wndBrowse.GetWindowText( strFilename );
+	theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, strFilename );
+
+	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
+
+	KillTimer( 1 );
+
+	CDialogExSized::OnDestroy();
 }
 
 void CVisualDiskImagerDlg::OnPaint()
@@ -224,7 +242,7 @@ void CVisualDiskImagerDlg::Start(bool bWrite)
 		m_wndDevices.EnableWindow( FALSE );
 		m_wndVerifyCheckbox.EnableWindow( FALSE );
 
-		m_wndProgress.SetPos( 0 );
+		m_nProgress = 0;
 		m_wndProgress.ShowWindow( SW_SHOW );
 
 		UpdateWindow();
@@ -275,6 +293,7 @@ LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
 	m_wndDevices.EnableWindow( TRUE );
 	m_wndVerifyCheckbox.EnableWindow( TRUE );
 
+	m_nProgress = -1;
 	m_wndProgress.ShowWindow( SW_HIDE );
 
 	UpdateWindow();
@@ -312,23 +331,13 @@ void CVisualDiskImagerDlg::Stop()
 	}
 }
 
-void CVisualDiskImagerDlg::OnDestroy()
-{
-	Stop();
-
-	ClearDevices();
-
-	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
-
-	CDialogExSized::OnDestroy();
-}
 
 void CVisualDiskImagerDlg::OnDropFiles(HDROP hDropInfo)
 {
 	TCHAR szPath[ 1024 ] = {};
 	if ( DragQueryFile( hDropInfo, 0, szPath, _countof( szPath ) ) )
 	{
-		SetFile( szPath );
+		m_wndBrowse.SetWindowText( CString( szPath ).Trim( _T(" \"") ) );
 
 		DragFinish( hDropInfo );
 		return;
@@ -337,27 +346,8 @@ void CVisualDiskImagerDlg::OnDropFiles(HDROP hDropInfo)
 	CDialogExSized::OnDropFiles( hDropInfo );
 }
 
-void CVisualDiskImagerDlg::SetFile(LPCTSTR szFilename)
-{
-	CString strFilename;
-	m_wndBrowse.GetWindowText( strFilename );
-	if ( szFilename == nullptr )
-	{
-		// Use current one
-		szFilename = strFilename;
-	}
-
-	if ( strFilename != szFilename )
-	{
-		m_wndBrowse.SetWindowText( szFilename );
-
-		theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, szFilename );
-	}
-}
-
 void CVisualDiskImagerDlg::OnEnChangeBrowse()
 {
-	SetFile();
 }
 
 void CVisualDiskImagerDlg::OnBnClickedRefresh()
@@ -442,4 +432,91 @@ LRESULT CVisualDiskImagerDlg::OnDeviceChange(WPARAM wParam, LPARAM lParam)
 		}
 	}
 	return TRUE;
+}
+
+void CVisualDiskImagerDlg::SelectLogAll()
+{
+	m_wndLog.SetItemState( -1, LVIS_SELECTED, LVIS_SELECTED );
+	m_wndLog.SetSelectionMark( 0 );
+}
+
+void CVisualDiskImagerDlg::CopyLog()
+{
+	CString sData;
+
+	int nItem = -1;
+	for ( int nSelected = m_wndLog.GetSelectedCount(); nSelected > 0; --nSelected )
+	{
+		nItem = m_wndLog.GetNextItem( nItem, LVNI_SELECTED );
+		if ( nItem == -1 )
+			break;
+
+		sData += m_wndLog.GetItemText( nItem, 0 );
+		sData += _T("\r\n");
+	}
+
+	if ( ! sData.IsEmpty() )
+	{
+		if ( OpenClipboard() )
+		{
+			if ( EmptyClipboard() )
+			{
+				const size_t nLen = static_cast< size_t >( sData.GetLength() + 1 ) * sizeof( TCHAR );
+				if ( HGLOBAL hGlob = GlobalAlloc( GMEM_FIXED, nLen ) )
+				{
+					CopyMemory( hGlob, static_cast< LPCTSTR >( sData ), nLen );
+
+					if ( SetClipboardData( CF_UNICODETEXT, hGlob ) == NULL )
+					{
+						// Ошибка
+						GlobalFree( hGlob );
+					}
+				}
+			}
+			CloseClipboard();
+		}
+	}
+}
+
+void CVisualDiskImagerDlg::OnLvnKeydownLog(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMLVKEYDOWN pLVKeyDow = reinterpret_cast< LPNMLVKEYDOWN >( pNMHDR );
+	*pResult = 0;
+
+	if ( GetKeyState( VK_CONTROL ) < 0 )
+	{
+		switch ( pLVKeyDow->wVKey )
+		{
+		case 'C':		// Ctrl+C
+		case 'X':		// Ctrl+X
+		case VK_INSERT:	// Ctrl+Insert
+			CopyLog();
+			break;
+
+		case 'A':		// Ctrl+A
+			SelectLogAll();
+			break;
+		}
+	}
+
+	if ( GetKeyState( VK_SHIFT ) < 0 )
+	{
+		switch ( pLVKeyDow->wVKey )
+		{
+		case VK_INSERT:	// Shift+Insert
+			CopyLog();
+			break;
+		}
+	}
+}
+
+void CVisualDiskImagerDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	const int nProgress =  m_nProgress;
+	if ( nProgress >= 0 )
+	{
+		m_wndProgress.SetPos( nProgress );
+	}
+
+	CDialogExSized::OnTimer(nIDEvent);
 }

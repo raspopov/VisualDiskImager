@@ -33,7 +33,6 @@
 #define IDS_FILE_FILTER                 155
 #define IDS_FILE_MISSING                156
 #define IDS_FILE_READ_ERROR             157
-#define IDS_FILE_SECTOR_SIZE            158
 #define IDS_FILE_SELECT                 159
 #define IDS_FILE_SIZE                   160
 #define IDS_FILE_ZERO_SIZE              161
@@ -55,7 +54,7 @@
 #define IDS_VOLUME_UNLOCK_ERROR         177
 #define IDS_WMI_ERROR                   178
 #define IDS_WRITE                       179
-#define IDS_WRITE_LEFT                  180
+#define IDS_WRITE_ERROR                 180
 #define IDS_WRITE_OK                    181
 #define IDS_WRITE_PROMPT                182
 #define IDS_WRITING                     183

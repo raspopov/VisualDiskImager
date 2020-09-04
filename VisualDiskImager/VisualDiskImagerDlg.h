@@ -34,6 +34,7 @@ protected:
 	std::thread			m_Thread;
 	volatile bool		m_bCancel;
 	CDevices			m_Devices;
+	int					m_nProgress;
 
 	void Start(bool bWrite);
 	void Stop();
@@ -48,20 +49,23 @@ protected:
 	// Clear enumerated devices list (i.e. m_wndDevices)
 	void ClearDevices();
 
-	// Set disk image file
-	void SetFile(LPCTSTR szFilename = nullptr);
-
 	// Enumerate disk volumes
 	void EnumDevices(bool bSilent);
 
 	// Return selected device
 	CDevice* GetSelectedDevice() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify);
-	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerify);
+	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite);
+	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite);
 
 	// Clear the log (with animation)
 	void ClearLog();
+
+	// Copy log to clipboard
+	void CopyLog();
+
+	// Select all lines of log
+	void SelectLogAll();
 
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 	virtual BOOL OnInitDialog();
@@ -81,6 +85,8 @@ protected:
 	afx_msg LRESULT OnEnum(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedVerifyButton();
 	afx_msg LRESULT OnDeviceChange(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnLvnKeydownLog(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 
 	DECLARE_MESSAGE_MAP()
 };
