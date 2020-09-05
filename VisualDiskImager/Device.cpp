@@ -158,7 +158,8 @@ bool CDevice::Open(bool bWrite)
 
 	if ( m_h == NULL )
 	{
-		HRESULT hr = CAtlFile::Create( Name, ( bWrite ? GENERIC_WRITE : 0 ) | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
+		HRESULT hr = CAtlFile::Create( Name, ( bWrite ? GENERIC_WRITE : 0 ) | GENERIC_READ,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING );
 		if ( FAILED( hr ) )
 		{
 			Log( LOG_ERROR, IDS_DEVICE_MISSING, (LPCTSTR)GetErrorString( hr ) );
@@ -188,8 +189,6 @@ bool CDevice::Update()
 	if ( m_h != NULL )
 	{
 		Log( LOG_ACTION, IDS_DEVICE_UPDATE );
-
-		VERIFY( SUCCEEDED ( CAtlFile::Flush() ) );
 
 		DWORD returned;
 		if ( ! DeviceIoControl( m_h, IOCTL_DISK_UPDATE_PROPERTIES, nullptr, 0, nullptr, 0, &returned, nullptr ) )
