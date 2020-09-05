@@ -1,6 +1,8 @@
 .vs
+packages
 x64
 Debug
 Release
 *.aps
 *.user
+*.exe
