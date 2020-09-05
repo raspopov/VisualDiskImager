@@ -33,6 +33,7 @@
 #define IDS_FILE_FILTER                 155
 #define IDS_FILE_MISSING                156
 #define IDS_FILE_READ_ERROR             157
+#define IDS_COPY                        158
 #define IDS_FILE_SELECT                 159
 #define IDS_FILE_SIZE                   160
 #define IDS_FILE_ZERO_SIZE              161
@@ -58,13 +59,16 @@
 #define IDS_WRITE_OK                    181
 #define IDS_WRITE_PROMPT                182
 #define IDS_WRITING                     183
+#define IDS_CANCELED                    184
 #define IDC_BROWSE                      1000
 #define IDC_DEVICES                     1001
-#define IDC_REFRESH                     1002
+#define IDC_REFRESH_BUTTON              1002
 #define IDC_PROGRESS                    1003
 #define IDC_LOG                         1004
-#define IDC_VERIFY                      1005
+#define IDC_VERIFY_CHECK                1005
 #define IDC_VERIFY_BUTTON               1006
+#define IDC_EXIT_BUTTON                 1007
+#define IDC_WRITE_BUTTON                1008
 
 // Next default values for new objects
 // 
@@ -72,7 +76,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        184
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1007
+#define _APS_NEXT_CONTROL_VALUE         1009
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

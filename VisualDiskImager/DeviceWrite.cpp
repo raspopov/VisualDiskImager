@@ -12,14 +12,14 @@
 
 // CVisualDiskImagerDlg
 
-void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite)
+void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice)
 {
-	pThis->WriteDisk( szFilename, szDevice, bWrite, bVerifyAfterWrite );
+	pThis->WriteDisk( szFilename, szDevice );
 
 	pThis->PostMessage( WM_DONE );
 }
 
-void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite)
+void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 {
 	Log( LOG_ACTION, IDS_FILE, szFilename );
 
@@ -38,7 +38,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 
 	// Open file
 	CAtlFile file;
-	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN );
+	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0 );
 	if ( FAILED( hr ) )
 	{
 		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( hr ) );
@@ -63,24 +63,21 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 	CDevice device( szDevice );
 	device.GetDeviceVolumes( false );
 
-	if ( bWrite )
+	// Lock device volumes
+	for ( const auto& volume : device.Volumes )
 	{
-		// Lock device volumes
-		for ( const auto& volume : device.Volumes )
-		{
-			volume->Lock();
-		}
+		volume->Lock();
+	}
 
-		// Unmount device volumes
-		for ( const auto& volume : device.Volumes )
-		{
-			volume->Dismount();
-		}
+	// Unmount device volumes
+	for ( const auto& volume : device.Volumes )
+	{
+		volume->Dismount();
 	}
 
 	// Open disk
 	Log( LOG_ACTION, IDS_DEVICE, szDevice );
-	if ( ! device.Open( bWrite ) )
+	if ( ! device.Open( m_Mode == MODE_WRITE || m_Mode == MODE_WRITE_VERIFY ) )
 	{
 		return;
 	}
@@ -100,20 +97,24 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 			Log( LOG_WARNING, IDS_DEVICE_SIZE_MISMATCH );
 		}
 	}
-	const DWORD bytes_per_sector = device.Info.Geometry.BytesPerSector ? device.Info.Geometry.BytesPerSector : 512;
 
-	const DWORD buf_size = 4 * 1024 * bytes_per_sector;
+	const DWORD bytes_per_sector = device.Info.Geometry.BytesPerSector ? device.Info.Geometry.BytesPerSector : 512;
+	const ULONGLONG size = min( file_size, disk_size );
+	const DWORD buf_size = 2 * 1024 * bytes_per_sector; // 1MB
 	CVirtualBuffer< char > file_buf( buf_size );
 	ULONGLONG pos = 0;
-	const ULONGLONG size = min( file_size, disk_size );
 
-	if ( bWrite && ! m_bCancel )
+	if ( ! m_bCancel && ( m_Mode == MODE_WRITE || m_Mode == MODE_WRITE_VERIFY ) )
 	{
 		// Write to disk
 		Log( LOG_ACTION, IDS_WRITING );
 
+		CTime start = CTime::GetCurrentTime();
+
 		while ( pos != size && ! m_bCancel )
 		{
+			Sleep( 0 );
+
 			const DWORD to_read = (DWORD)min( size - pos, buf_size );
 			DWORD to_write = to_read;
 			if ( to_read % bytes_per_sector != 0 )
@@ -158,7 +159,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		if ( pos == size )
 		{
 			// Success
-			Log( LOG_INFO, IDS_WRITE_OK );
+			Log( LOG_INFO, IDS_WRITE_OK, ( CTime::GetCurrentTime() - start ).Format( _T("%H:%M:%S") ) );
 		}
 		else
 		{
@@ -167,7 +168,9 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		}
 	}
 
-	if ( ( ! bWrite || ( pos == size && bVerifyAfterWrite ) ) && ! m_bCancel )
+	Sleep( 500 );
+
+	if ( ! m_bCancel && ( m_Mode == MODE_VERIFY || ( m_Mode == MODE_WRITE_VERIFY && pos == size ) ) )
 	{
 		// Verify disk
 		Log( LOG_ACTION, IDS_VERIFYING );
@@ -176,6 +179,8 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		pos = 0;
 		while ( pos != size && ! m_bCancel )
 		{
+			Sleep( 0 );
+
 			const DWORD to_read = (DWORD)min( size - pos, buf_size );
 			DWORD to_verify = to_read;
 			if ( to_read % bytes_per_sector != 0 )
@@ -221,17 +226,21 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool 
 		}
 	}
 
-	if ( bWrite )
+	// Unlock device volumes
+	for ( const auto& volume : device.Volumes )
 	{
-		// Unlock device volumes
-		for ( const auto& volume : device.Volumes )
-		{
-			volume->Unlock();
-		}
-
-		// Update device
-		device.Update();
+		volume->Unlock();
 	}
 
-	Log( LOG_INFO, IDS_DONE );
+	// Update device
+	device.Update();
+
+	if ( m_bCancel )
+	{
+		Log( LOG_WARNING, IDS_CANCELED );
+	}
+	else
+	{
+		Log( LOG_INFO, IDS_DONE );
+	}
 }

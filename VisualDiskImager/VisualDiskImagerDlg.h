@@ -7,6 +7,13 @@
 #include "Device.h"
 #include "DialogExSized.h"
 
+// Process modes
+enum Mode { MODE_STOP = 0, MODE_WRITE, MODE_WRITE_VERIFY, MODE_VERIFY };
+
+#define WM_LOG		( WM_USER + 1 )	// Log window message
+#define WM_DONE		( WM_USER + 2 )	// End of task message
+#define WM_ENUM		( WM_USER + 3 )	// Enumerate devices message
+
 // CVisualDiskImagerDlg dialog
 
 class CVisualDiskImagerDlg : public CDialogExSized
@@ -24,7 +31,7 @@ protected:
 
 	CButton				m_wndWriteButton;	// "Write"/"Stop" button
 	CButton				m_wndVerifyButton;	// "Verify"/"Stop" button
-	CButton				m_wndRefresh;		// "Refresh" button
+	CButton				m_wndRefreshButton;		// "Refresh" button
 	CMFCEditBrowseCtrl	m_wndBrowse;
 	CComboBox			m_wndDevices;		// Enumerated devices list
 	CButton				m_wndVerifyCheckbox;
@@ -34,11 +41,16 @@ protected:
 	std::thread			m_Thread;
 	volatile bool		m_bCancel;
 	CDevices			m_Devices;
-	int					m_nProgress;
+	int					m_nProgress;		// 0-100% or -1
+	Mode				m_Mode;
 
-	void Start(bool bWrite);
+	// Start write/verify process
+	void Start(Mode mode);
+
+	// Stop process
 	void Stop();
 
+	// Is process started?
 	inline bool IsStarted() const noexcept
 	{
 		 return m_Thread.joinable();
@@ -55,8 +67,8 @@ protected:
 	// Return selected device
 	CDevice* GetSelectedDevice() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite);
-	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice, bool bWrite, bool bVerifyAfterWrite);
+	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice);
+	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice);
 
 	// Clear the log (with animation)
 	void ClearLog();
@@ -67,7 +79,7 @@ protected:
 	// Select all lines of log
 	void SelectLogAll();
 
-	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX);
 	virtual BOOL OnInitDialog();
 	virtual void OnOK();
 	virtual void OnCancel();
@@ -77,20 +89,19 @@ protected:
 	afx_msg void OnDestroy();
 	afx_msg void OnDropFiles(HDROP hDropInfo);
 	afx_msg void OnEnChangeBrowse();
-	afx_msg void OnBnClickedRefresh();
+	afx_msg void OnBnClickedRefreshButton();
+	afx_msg void OnBnClickedWriteButton();
+	afx_msg void OnBnClickedVerifyButton();
+	afx_msg void OnBnClickedExitButton();
 	afx_msg void OnCbnSelchangeDevices();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg LRESULT OnLog(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnDone(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnEnum(WPARAM wParam, LPARAM lParam);
-	afx_msg void OnBnClickedVerifyButton();
 	afx_msg LRESULT OnDeviceChange(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnLvnKeydownLog(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnNMRClickLog(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 
 	DECLARE_MESSAGE_MAP()
 };
-
-#define WM_LOG		( WM_USER + 1 )	// Log window message
-#define WM_DONE		( WM_USER + 2 )	// End of task message
-#define WM_ENUM		( WM_USER + 3 )	// End of task message
