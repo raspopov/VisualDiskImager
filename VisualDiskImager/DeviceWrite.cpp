@@ -38,7 +38,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 
 	// Open file
 	CAtlFile file;
-	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0 );
+	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN );
 	if ( FAILED( hr ) )
 	{
 		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( hr ) );
@@ -124,24 +124,22 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 				// Read incomplete sector from device
 				const DWORD last_pos = ( to_read / bytes_per_sector ) * bytes_per_sector;
 				if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
-					 FAILED( hr = device.Read( static_cast< char* >( file_buf ) + last_pos, bytes_per_sector ) ) )
+					 FAILED( hr = device.Read( static_cast< char* >( file_buf ) + last_pos, bytes_per_sector ) ) ||
+					 FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
 				{
 					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
 					break;
 				}
 			}
 
-			if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) ||
-				 FAILED( hr = file.Read( file_buf, to_read ) ) )
+			if ( FAILED( hr = file.Read( file_buf, to_read ) ) )
 			{
 				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
 				break;
 			}
 
 			DWORD written = 0;
-			if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
-				 FAILED( hr = device.Write( file_buf, to_write, &written ) ) ||
-				 written != to_write )
+			if ( FAILED( hr = device.Write( file_buf, to_write, &written ) ) || written != to_write )
 			{
 				pos += written;
 
@@ -177,52 +175,62 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 
 		CVirtualBuffer< char > device_buf( buf_size );
 		pos = 0;
-		while ( pos != size && ! m_bCancel )
+		if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) )
 		{
-			Sleep( 0 );
-
-			const DWORD to_read = (DWORD)min( size - pos, buf_size );
-			DWORD to_verify = to_read;
-			if ( to_read % bytes_per_sector != 0 )
-			{
-				to_verify = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
-			}
-
-			if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) ||
-				 FAILED( hr = file.Read( file_buf, to_read ) ) )
-			{
-				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
-				break;
-			}
-
-			if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
-				 FAILED( hr = device.Read( device_buf, to_verify ) ) )
-			{
-				Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
-				break;
-			}
-
-			DWORD count = to_read;
-			for ( char *p1 = file_buf, *p2 = device_buf; count; --count )
-			{
-				if ( *p1++ != *p2++ )
-					break;
-			}
-			if ( count )
-			{
-				Log( LOG_ERROR, IDS_VERIFY_ERROR, pos + to_read - count );
-				break;
-			}
-
-			pos += to_read;
-
-			m_nProgress = (int)( ( pos * 100 ) / file_size );
+			Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
 		}
-
-		if ( pos == size )
+		else if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
 		{
-			// Success
-			Log( LOG_INFO, IDS_VERIFY_OK );
+			Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+		}
+		else
+		{
+			while ( pos != size && ! m_bCancel )
+			{
+				Sleep( 0 );
+
+				const DWORD to_read = (DWORD)min( size - pos, buf_size );
+				DWORD to_verify = to_read;
+				if ( to_read % bytes_per_sector != 0 )
+				{
+					to_verify = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
+				}
+
+				if ( FAILED( hr = file.Read( file_buf, to_read ) ) )
+				{
+					Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					break;
+				}
+
+				if ( FAILED( hr = device.Read( device_buf, to_verify ) ) )
+				{
+					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					break;
+				}
+
+				// Compare
+				DWORD count = to_read;
+				for ( char *p1 = file_buf, *p2 = device_buf; count; --count )
+				{
+					if ( *p1++ != *p2++ )
+						break;
+				}
+				if ( count )
+				{
+					Log( LOG_ERROR, IDS_VERIFY_ERROR, pos + to_read - count );
+					break;
+				}
+
+				pos += to_read;
+
+				m_nProgress = (int)( ( pos * 100 ) / file_size );
+			}
+
+			if ( pos == size )
+			{
+				// Success
+				Log( LOG_INFO, IDS_VERIFY_OK );
+			}
 		}
 	}
 
