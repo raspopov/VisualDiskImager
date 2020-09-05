@@ -56,6 +56,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include <memory>
 #include <thread>
 
+#define WM_COPYGLOBALDATA 0x0049
+
 #ifdef _UNICODE
 #if defined _M_IX86
 #pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='x86' publicKeyToken='6595b64144ccf1df' language='*'\"")

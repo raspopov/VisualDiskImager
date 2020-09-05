@@ -139,6 +139,16 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	m_wndVerifyCheckbox.SetCheck( theApp.GetProfileInt( REG_SETTINGS, REG_VERIFY, TRUE ) ? BST_CHECKED : BST_UNCHECKED );
 
+	// Bypass UAC for drag-n-drop
+	if ( auto ChangeWindowMessageFilterEx = reinterpret_cast< BOOL (WINAPI *)( HWND, UINT, DWORD, PCHANGEFILTERSTRUCT ) > (
+		GetProcAddress( LoadLibrary( _T("USER32.DLL") ), "ChangeWindowMessageFilterEx" ) ) )
+	{
+		CHANGEFILTERSTRUCT filter = { sizeof( CHANGEFILTERSTRUCT ) };
+		VERIFY( ChangeWindowMessageFilterEx( GetSafeHwnd(), WM_DROPFILES, MSGFLT_ALLOW, &filter ) );
+		VERIFY( ChangeWindowMessageFilterEx( GetSafeHwnd(), WM_COPYDATA, MSGFLT_ALLOW, &filter ) );
+		VERIFY( ChangeWindowMessageFilterEx( GetSafeHwnd(), WM_COPYGLOBALDATA, MSGFLT_ALLOW, &filter ) );
+	}
+
 	DragAcceptFiles();
 
 	if ( bLoad )
