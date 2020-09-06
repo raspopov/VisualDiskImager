@@ -1,5 +1,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/wdo1lp9i82c2d552?svg=true)](https://ci.appveyor.com/project/raspopov/visualdiskimager)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/0d8a5451f6774b568698a26a4691d15b)](https://www.codacy.com/manual/raspopov/VisualDiskImager?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=raspopov/VisualDiskImager&amp;utm_campaign=Badge_Grade)
+[![GitHub All Releases](https://img.shields.io/github/downloads/raspopov/VisualDiskImager/total)](https://github.com/raspopov/VisualDiskImager/releases)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/raspopov/VisualDiskImager)](https://github.com/raspopov/VisualDiskImager/releases)
 
 # Visual Disk Imager
 
