@@ -23,12 +23,11 @@ overwhelming feature richness of [BOOTICE](https://www.google.com/search?q=booti
 ## System Requirements
 
  - Windows XP or later, 32 or 64-bit.
- - Microsoft Visual C++ 2015-2019 Redistributables ([32-bit](https://aka.ms/vs/15/release/VC_redist.x86.exe)/[64-bit](https://aka.ms/vs/15/release/VC_redist.x64.exe)).
  - Administrator rights.
 
 ## Development Requirements
 
- - [Microsoft Visual Studio 2017 Community](https://aka.ms/vs/15/release/vs_Community.exe) with components:
+ - [Microsoft Visual Studio 2022 Community](https://aka.ms/vs/17/release/vs_Community.exe) with components:
    - Microsoft.VisualStudio.Workload.NativeDesktop
    - Microsoft.VisualStudio.Component.VC.ATLMFC
    - Microsoft.VisualStudio.Component.WinXP
@@ -37,7 +36,7 @@ overwhelming feature richness of [BOOTICE](https://www.google.com/search?q=booti
 
 ## License
 
-Copyright (C) 2020 Nikolay Raspopov <<raspopov@cherubicsoft.com>>
+Copyright (C) 2020-2024 Nikolay Raspopov <<raspopov@cherubicsoft.com>>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
