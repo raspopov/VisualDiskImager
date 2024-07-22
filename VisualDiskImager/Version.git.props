@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<ItemDefinitionGroup>
+<PreBuildEvent>
+<Command>
+where /q git
+if errorlevel 1 ( echo No Git detected! &amp; exit /b 1 )
+for /f %%i in ('git rev-list HEAD --count') do ( echo #define BUILD_VERSION %%i &gt; Build.h &amp; exit /b 0 )
+</Command>
+</PreBuildEvent>
+</ItemDefinitionGroup>
+</Project>

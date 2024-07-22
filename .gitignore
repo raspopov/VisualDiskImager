@@ -6,3 +6,6 @@ Release
 *.aps
 *.user
 *.exe
+Build.h
+*.bin
+*.img
