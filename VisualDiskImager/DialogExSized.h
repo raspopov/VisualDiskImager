@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -19,30 +19,34 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "Sized.h"
+
 // CDialogExSized dialog
 
-class CDialogExSized : public CDialogEx
+class CDialogExSized : public CDialogEx, public CSized< CDialogExSized >
 {
 	DECLARE_DYNAMIC(CDialogExSized)
 
 public:
-	CDialogExSized() = default;
 	CDialogExSized(UINT nIDTemplate, CWnd *pParent = nullptr) : CDialogEx( nIDTemplate, pParent ) {}
 	CDialogExSized(LPCTSTR lpszTemplateName, CWnd *pParentWnd = nullptr) : CDialogEx( lpszTemplateName, pParentWnd ) {}
-	virtual ~CDialogExSized() override = default;
 
-	void ReloadLayout();
+	void ReloadLayout()
+	{
+		ASSERT( ! IsIconic() );
 
-	void SaveWindowPlacement();
-	void RestoreWindowPlacement();
+		VERIFY( LoadDynamicLayoutResource( m_lpszTemplateName ) );
 
-private:
-	CRect m_rcInitial,  m_rcInitialClient;		// Начальный (минимальный) размер окна
+		if ( auto pLayout = GetDynamicLayout() )
+		{
+			pLayout->SetMinSize( m_sizeMinClient );
+		}
+	}
 
 protected:
-	virtual BOOL OnInitDialog() override;
+	BOOL OnInitDialog() override;
 
-	afx_msg void OnGetMinMaxInfo( MINMAXINFO* lpMMI );
+	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 	afx_msg void OnDestroy();
 
 	DECLARE_MESSAGE_MAP()

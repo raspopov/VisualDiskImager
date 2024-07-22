@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -25,11 +25,11 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
-// CDialogExSized dialog
-
-IMPLEMENT_DYNAMIC(CDialogExSized, CDialogEx)
+IMPLEMENT_DYNAMIC(CDialogExSized, CDialogEx) //-V2018
 
 BEGIN_MESSAGE_MAP(CDialogExSized, CDialogEx)
 	ON_WM_GETMINMAXINFO()
@@ -40,59 +40,14 @@ BOOL CDialogExSized::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	GetWindowRect( m_rcInitial );
-	GetClientRect( m_rcInitialClient );
-
-	if ( m_pDynamicLayout )
-		m_pDynamicLayout->SetMinSize( m_rcInitialClient.Size() );
+	InitialLayout();
 
 	return TRUE;
 }
 
-void CDialogExSized::ReloadLayout()
+void CDialogExSized::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
-	ASSERT( ! IsIconic() );
-
-	VERIFY( LoadDynamicLayoutResource( m_lpszTemplateName ) );
-
-	if ( m_pDynamicLayout )
-		m_pDynamicLayout->SetMinSize( m_rcInitialClient.Size() );
-}
-
-void CDialogExSized::SaveWindowPlacement()
-{
-	CString sClassName( GetRuntimeClass()->m_lpszClassName );
-	ASSERT( sClassName != ("CDialogExSized") ); // Use DECLARE_DYNAMIC() in the child class.
-
-	WINDOWPLACEMENT wp = { sizeof( WINDOWPLACEMENT ) };
-	if ( GetWindowPlacement( &wp ) )
-	{
-		AfxGetApp()->WriteProfileBinary( _T("Window"), sClassName + _T("_position"), (LPBYTE)&wp, sizeof( WINDOWPLACEMENT ) );
-	}
-}
-
-void CDialogExSized::RestoreWindowPlacement()
-{
-	CString sClassName( GetRuntimeClass()->m_lpszClassName );
-	ASSERT( sClassName != ("CDialogExSized") ); // Use DECLARE_DYNAMIC() in the child class.
-
-	CAutoVectorPtr< WINDOWPLACEMENT >wp;
-	UINT wp_size = 0;
-	if ( AfxGetApp()->GetProfileBinary( _T("Window"), sClassName + _T("_position"), (LPBYTE*)&wp, &wp_size ) &&
-			wp_size == sizeof( WINDOWPLACEMENT ) )
-	{
-		SetWindowPlacement( wp );
-	}
-}
-
-// CDialogExSized message handlers
-
-void CDialogExSized::OnGetMinMaxInfo( MINMAXINFO* lpMMI )
-{
-	lpMMI->ptMaxTrackSize.x = GetSystemMetrics( SM_CXMAXIMIZED );
-	lpMMI->ptMaxTrackSize.y = GetSystemMetrics( SM_CYMAXIMIZED );
-	lpMMI->ptMinTrackSize.x = min( m_rcInitial.Width(),  lpMMI->ptMaxTrackSize.x );
-	lpMMI->ptMinTrackSize.y = min( m_rcInitial.Height(), lpMMI->ptMaxTrackSize.y );
+	OnMinMaxInfo( lpMMI );
 
 	CDialogEx::OnGetMinMaxInfo( lpMMI );
 }
