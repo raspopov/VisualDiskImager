@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,18 +26,16 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
 // CVisualDiskImagerDlg dialog
 
-IMPLEMENT_DYNAMIC(CVisualDiskImagerDlg, CDialogExSized)
+IMPLEMENT_DYNAMIC(CVisualDiskImagerDlg, CDialogExSized) //-V2018
 
 CVisualDiskImagerDlg::CVisualDiskImagerDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogExSized( IDD, pParent )
-	, m_hIcon		( nullptr )
-	, m_bCancel		( false )
-	, m_nProgress	( -1 )
-	, m_Mode		( MODE_STOP )
 {
 }
 
@@ -95,11 +93,13 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 			if ( GetFileVersionInfo( sBinaryPath, 0, dwSize, pBuffer ) )
 			{
 				VS_FIXEDFILEINFO* pTable = nullptr;
-				if ( VerQueryValue( pBuffer, _T("\\"), (VOID**)&pTable, (UINT*)&dwSize ) )
+				if ( VerQueryValue( pBuffer, _T("\\"), reinterpret_cast< LPVOID * >( &pTable ), reinterpret_cast< PUINT >( &dwSize ) ) )
 				{
 					sVersion.Format( _T("%u.%u.%u.%u"),
-						(WORD)( pTable->dwFileVersionMS >> 16 ), (WORD)( pTable->dwFileVersionMS & 0xFFFF ),
-						(WORD)( pTable->dwFileVersionLS >> 16 ), (WORD)( pTable->dwFileVersionLS & 0xFFFF ) );
+						static_cast< WORD >( pTable->dwFileVersionMS >> 16 ),
+						static_cast< WORD >( pTable->dwFileVersionMS & 0xFFFF ),
+						static_cast< WORD >( pTable->dwFileVersionLS >> 16 ),
+						static_cast< WORD >( pTable->dwFileVersionLS & 0xFFFF ) );
 				}
 			}
 		}
@@ -158,9 +158,9 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	UpdateSize();
 
-	SetTimer( 1, 500, nullptr );
+	UpdateInterface();
 
-	PostMessage( WM_DONE );
+	SetTimer( 1, 500, nullptr );
 
 	PostMessage( WM_ENUM );
 
@@ -173,9 +173,10 @@ void CVisualDiskImagerDlg::OnDestroy()
 
 	ClearDevices();
 
-	CString strFilename;
-	m_wndBrowse.GetWindowText( strFilename );
-	theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, strFilename );
+	CString sFilename;
+	m_wndBrowse.GetWindowText( sFilename );
+	sFilename.Trim();
+	theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, sFilename );
 
 	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
 
@@ -293,76 +294,65 @@ void CVisualDiskImagerDlg::OnBnClickedVerifyButton()
 	}
 }
 
-void CVisualDiskImagerDlg::Start(Mode mode)
+void CVisualDiskImagerDlg::UpdateInterface()
 {
-	if ( auto pdevice = GetSelectedDevice() )
+	UpdateData();
+
+	CString sFilename;
+	m_wndBrowse.GetWindowText( sFilename );
+	sFilename.Trim();
+	const auto exist = ! sFilename.IsEmpty() && ( GetFileAttributes( LONG_PATH + sFilename ) & FILE_ATTRIBUTE_DIRECTORY ) == 0 && GetSelectedDevice() != nullptr;
+
+	switch ( m_Mode )
 	{
-		CWaitCursor wc;
+	case MODE_WRITE:
+	case MODE_WRITE_VERIFY:
+		m_wndWriteButton.SetWindowText( LoadString( IDS_CANCEL ) );
+		m_wndVerifyButton.EnableWindow( FALSE );
+		break;
 
-		CString strFilename;
-		m_wndBrowse.GetWindowText( strFilename );
+	case MODE_VERIFY:
+		m_wndWriteButton.EnableWindow( FALSE );
+		m_wndVerifyButton.SetWindowText( LoadString( IDS_CANCEL ) );
+		break;
 
-		ClearLog();
-
-		switch ( m_Mode = mode )
-		{
-		case MODE_WRITE:
-		case MODE_WRITE_VERIFY:
-			m_wndWriteButton.SetWindowText( LoadString( IDS_CANCEL ) );
-			m_wndVerifyButton.EnableWindow( FALSE );
-			break;
-
-		case MODE_VERIFY:
-			m_wndWriteButton.EnableWindow( FALSE );
-			m_wndVerifyButton.SetWindowText( LoadString( IDS_CANCEL ) );
-			break;
-		}
-
-		m_wndRefreshButton.EnableWindow( FALSE );
-		m_wndBrowse.EnableWindow( FALSE );
-		m_wndDevices.EnableWindow( FALSE );
-		m_wndVerifyCheckbox.EnableWindow( FALSE );
-
-		m_nProgress = 0;
-		m_wndProgress.ShowWindow( SW_SHOW );
-
-		UpdateWindow();
-
-		m_bCancel = false;
-		m_Thread = std::thread( &CVisualDiskImagerDlg::WriteDiskThread, this, strFilename, pdevice->Name );
+	default:
+		m_wndWriteButton.SetWindowText( LoadString( IDS_WRITE ) );
+		m_wndWriteButton.EnableWindow( exist ? TRUE : FALSE );
+		m_wndVerifyButton.SetWindowText( LoadString( IDS_VERIFY ) );
+		m_wndVerifyButton.EnableWindow( exist ? TRUE : FALSE );
 	}
-}
 
-LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
-{
-	Stop();
+	m_wndRefreshButton.EnableWindow( ( m_Mode == MODE_STOP ) );
+	m_wndBrowse.EnableWindow( ( m_Mode == MODE_STOP ) );
+	m_wndDevices.EnableWindow( ( m_Mode == MODE_STOP ) );
+	m_wndVerifyCheckbox.EnableWindow( ( m_Mode == MODE_STOP ) );
 
-	m_wndWriteButton.SetWindowText( LoadString( IDS_WRITE ) );
-	m_wndWriteButton.EnableWindow( TRUE );
-
-	m_wndVerifyButton.SetWindowText( LoadString( IDS_VERIFY ) );
-	m_wndVerifyButton.EnableWindow( TRUE );
-
-	m_wndRefreshButton.EnableWindow( TRUE );
-	m_wndBrowse.EnableWindow( TRUE );
-	m_wndDevices.EnableWindow( TRUE );
-	m_wndVerifyCheckbox.EnableWindow( TRUE );
-
-	m_nProgress = -1;
-	m_wndProgress.ShowWindow( SW_HIDE );
+	m_nProgress = ( m_Mode == MODE_STOP ) ? -1 : 0;
+	m_wndProgress.ShowWindow( ( m_Mode == MODE_STOP ) ? SW_HIDE : SW_SHOW );
 
 	UpdateWindow();
-
-	return 0;
 }
 
-LRESULT CVisualDiskImagerDlg::OnEnum(WPARAM wParam, LPARAM /*lParam*/)
+void CVisualDiskImagerDlg::Start(Mode mode)
 {
 	CWaitCursor wc;
 
-	EnumDevices( wParam );
+	if ( auto pdevice = GetSelectedDevice() )
+	{
+		CString sFilename;
+		m_wndBrowse.GetWindowText( sFilename );
+		sFilename.Trim();
 
-	return 0;
+		ClearLog();
+
+		m_Mode = mode;
+
+		UpdateInterface();
+
+		m_bCancel = false;
+		m_Thread = std::thread( &CVisualDiskImagerDlg::WriteDiskThread, this, sFilename, pdevice->Name );
+	}
 }
 
 void CVisualDiskImagerDlg::Stop()
@@ -386,8 +376,31 @@ void CVisualDiskImagerDlg::Stop()
 	}
 
 	m_Mode = MODE_STOP;
+
+	UpdateInterface();
 }
 
+LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
+{
+	Stop();
+
+	return 0;
+}
+
+LRESULT CVisualDiskImagerDlg::OnEnum(WPARAM wParam, LPARAM /*lParam*/)
+{
+	CWaitCursor wc;
+
+	ClearDevices();
+
+	UpdateInterface();
+
+	EnumDevices( wParam );
+
+	UpdateInterface();
+
+	return 0;
+}
 
 void CVisualDiskImagerDlg::OnDropFiles(HDROP hDropInfo)
 {
@@ -400,11 +413,14 @@ void CVisualDiskImagerDlg::OnDropFiles(HDROP hDropInfo)
 		return;
 	}
 
+	UpdateInterface();
+
 	CDialogExSized::OnDropFiles( hDropInfo );
 }
 
 void CVisualDiskImagerDlg::OnEnChangeBrowse()
 {
+	UpdateInterface();
 }
 
 void CVisualDiskImagerDlg::ClearDevices()
@@ -427,11 +443,12 @@ CDevice* CVisualDiskImagerDlg::GetSelectedDevice() const
 
 void CVisualDiskImagerDlg::OnCbnSelchangeDevices()
 {
-	auto pdevice = GetSelectedDevice();
-	if ( pdevice )
+	if ( auto pdevice = GetSelectedDevice() )
 	{
 		theApp.WriteProfileString( REG_SETTINGS, REG_DEVICE, pdevice->Name );
 	}
+
+	UpdateInterface();
 }
 
 void CVisualDiskImagerDlg::ClearLog()
@@ -473,6 +490,8 @@ void CVisualDiskImagerDlg::OnSize(UINT nType, int cx, int cy)
 
 LRESULT CVisualDiskImagerDlg::OnDeviceChange(WPARAM wParam, LPARAM lParam)
 {
+	UNUSED_ALWAYS( lParam );
+
 	// Asynchronous call from WMI
 	if ( wParam == DBT_DEVNODES_CHANGED )
 	{

@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,6 +26,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
 // CDeviceVolume
@@ -45,12 +47,12 @@ bool CDeviceVolume::Open()
 {
 	ASSERT( ! Name.IsEmpty() );
 
-	if ( m_h == NULL )
+	if ( ! m_h )
 	{
 		HRESULT hr = CAtlFile::Create( Name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
 		if ( FAILED( hr ) )
 		{
-			Log( LOG_WARNING, IDS_VOLUME_MISSING, (LPCTSTR)GetErrorString( hr ) );
+			Log( LOG_WARNING, IDS_VOLUME_MISSING, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 			return false;
 		}
 	}
@@ -63,12 +65,12 @@ bool CDeviceVolume::Lock()
 	{
 		if ( ! m_bLocked )
 		{
-			Log( LOG_ACTION, IDS_VOLUME_LOCK, (LPCTSTR)Name );
+			Log( LOG_ACTION, IDS_VOLUME_LOCK, static_cast< LPCTSTR >( Name ) );
 
 			DWORD returned;
 			if ( ! DeviceIoControl( m_h, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 			{
-				Log( LOG_WARNING, IDS_VOLUME_LOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+				Log( LOG_WARNING, IDS_VOLUME_LOCK_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 				return false;
 			}
 
@@ -81,16 +83,16 @@ bool CDeviceVolume::Lock()
 
 bool CDeviceVolume::Unlock()
 {
-	if ( m_h != NULL )
+	if ( m_h )
 	{
 		if ( m_bLocked )
 		{
-			Log( LOG_ACTION, IDS_VOLUME_UNLOCK, (LPCTSTR)Name );
+			Log( LOG_ACTION, IDS_VOLUME_UNLOCK, static_cast< LPCTSTR >( Name ) );
 
 			DWORD returned;
 			if ( ! DeviceIoControl( m_h, FSCTL_UNLOCK_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 			{
-				Log( LOG_WARNING, IDS_VOLUME_UNLOCK_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+				Log( LOG_WARNING, IDS_VOLUME_UNLOCK_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 			}
 
 			m_bLocked = false;
@@ -105,14 +107,14 @@ bool CDeviceVolume::Unlock()
 
 bool CDeviceVolume::Dismount()
 {
-	if ( m_h != NULL )
+	if ( m_h )
 	{
-		Log( LOG_ACTION, IDS_VOLUME_DISMOUNT, (LPCTSTR)Name );
+		Log( LOG_ACTION, IDS_VOLUME_DISMOUNT, static_cast< LPCTSTR >( Name ) );
 
 		DWORD returned;
 		if ( ! DeviceIoControl( m_h, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 		{
-			Log( LOG_WARNING, IDS_VOLUME_DISMOUNT_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			Log( LOG_WARNING, IDS_VOLUME_DISMOUNT_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 			return false;
 		}
 		return true;

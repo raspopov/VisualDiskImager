@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ public:
 	enum { IDD = IDD_VISUALDISKIMAGER_DIALOG };
 
 protected:
-	HICON				m_hIcon;
+	HICON				m_hIcon = nullptr;
 	CImageList			m_Images;
 
 	CButton				m_wndWriteButton;	// "Write"/"Stop" button
@@ -54,10 +54,12 @@ protected:
 	CListCtrl			m_wndLog;
 
 	std::thread			m_Thread;
-	volatile bool		m_bCancel;
+	volatile bool		m_bCancel = false;
 	CDevices			m_Devices;
-	int					m_nProgress;		// 0-100% or -1
-	Mode				m_Mode;
+	int					m_nProgress = -1;	// 0-100% or -1
+	Mode				m_Mode = MODE_STOP;
+
+	void UpdateInterface();
 
 	// Start write/verify process
 	void Start(Mode mode);
@@ -82,8 +84,8 @@ protected:
 	// Return selected device
 	CDevice* GetSelectedDevice() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice);
-	void WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice);
+	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice);
+	void WriteDisk(CString sFilename, CString sDevice);
 
 	// Clear the log (with animation)
 	void ClearLog();
@@ -94,10 +96,10 @@ protected:
 	// Select all lines of log
 	void SelectLogAll();
 
-	virtual void DoDataExchange(CDataExchange* pDX);
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
-	virtual void OnCancel();
+	void DoDataExchange(CDataExchange* pDX) override;
+	BOOL OnInitDialog() override;
+	void OnOK() override;
+	void OnCancel() override;
 
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();

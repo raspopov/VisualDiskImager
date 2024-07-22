@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #define _AFX_ALL_WARNINGS
 
+#define NOMINMAX
+
 #include <afxwin.h>
 #include <afxext.h>
 
@@ -57,6 +59,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include <thread>
 
 #define WM_COPYGLOBALDATA 0x0049
+
+#define LONG_PATH CString( _T("\\\\?\\") )
 
 #ifdef _UNICODE
 #if defined _M_IX86

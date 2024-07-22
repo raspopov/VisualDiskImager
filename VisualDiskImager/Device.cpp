@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,6 +26,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
 // CDevice
@@ -35,20 +37,15 @@ CDevice::CDevice(LPCTSTR szDeviceID)
 	, Info		()
 	, Writable	( false )
 	, System	( false )
-	, Removable	( false )
-{
-}
-
-CDevice::~CDevice()
 {
 }
 
 bool CDevice::Init(IWbemClassObject* disk)
 {
-	CComVariant id, model, type, capabilities;
-	if ( SUCCEEDED( disk->Get( L"DeviceID", 0, &id, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"Model", 0, &model, 0, 0 ) ) &&
-		 SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, 0, 0 ) ) )
+	CComVariant id, model, type;
+	if ( SUCCEEDED( disk->Get( L"DeviceID", 0, &id, nullptr, nullptr ) ) &&
+		 SUCCEEDED( disk->Get( L"Model", 0, &model, nullptr, nullptr ) ) &&
+		 SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, nullptr, nullptr ) ) )
 	{
 		VERIFY( SUCCEEDED( id.ChangeType( VT_BSTR ) ) );
 		Name = id;
@@ -61,9 +58,7 @@ bool CDevice::Init(IWbemClassObject* disk)
 
 		if ( Open( false ) )
 		{
-			Removable = ( Info.Geometry.MediaType != FixedMedia );
-
-			if ( Info.DiskSize.QuadPart == 0 )
+			if ( DiskSize() == 0 )
 			{
 				Writable = false;
 			}
@@ -78,7 +73,7 @@ bool CDevice::Init(IWbemClassObject* disk)
 
 void CDevice::GetDeviceVolumes(bool bSilent)
 {
-	if ( ! bSilent ) Log( LOG_ACTION, IDS_ENUM_VOLUME, (LPCTSTR) Name );
+	if ( ! bSilent ) Log( LOG_ACTION, IDS_ENUM_VOLUME, static_cast< LPCTSTR >( Name ) );
 
 	Volumes.clear();
 
@@ -91,9 +86,6 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 	HANDLE hFindVolume = FindFirstVolume( szVolumeName, MAX_PATH );
 	if ( hFindVolume != INVALID_HANDLE_VALUE )
 	{
-		TCHAR buf[ 1024 ];
-		DWORD returned;
-
 		do
 		{
 			// Volume name without ending slash
@@ -102,14 +94,16 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 			bool bSystemVolume = false;
 
 			// Get disk DOS names
-			if ( GetVolumePathNamesForVolumeName( szVolumeName, buf, _countof( buf ), &returned ) )
+			TCHAR buf_name[ 1024 ];
+			DWORD returned_name = 0;
+			if ( GetVolumePathNamesForVolumeName( szVolumeName, buf_name, _countof( buf_name ), &returned_name ) )
 			{
 				size_t name_len;
-				for ( LPCTSTR name = buf; *name; name += name_len )
+				for ( LPCTSTR name = buf_name; *name; name += name_len )
 				{
 					name_len = _tcslen( name );
 
-					volume->PathNames.push_back( name );
+					volume->PathNames.emplace_back( name );
 
 					// Check for system volume
 					if ( StrCmpNI( name, szSystem, static_cast< int >( name_len ) ) == 0 )
@@ -124,13 +118,14 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 			HRESULT hr = volume_file.Create( volume->Name, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
 			if ( SUCCEEDED( hr ) )
 			{
-				if ( DeviceIoControl( volume_file, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, buf, sizeof( buf ), &returned, nullptr ) )
+				union { VOLUME_DISK_EXTENTS extents; char buf[ 1024 ]; } buf_extents;
+				DWORD returned_extents = 0;
+				if ( DeviceIoControl( volume_file, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, &buf_extents, sizeof( buf_extents ), &returned_extents, nullptr ) )
 				{
-					PVOLUME_DISK_EXTENTS extents = reinterpret_cast< PVOLUME_DISK_EXTENTS >( buf );
-					for ( DWORD extent = 0; extent < extents->NumberOfDiskExtents; ++ extent )
+					for ( DWORD extent = 0; extent < buf_extents.extents.NumberOfDiskExtents; ++ extent )
 					{
 						CString device_id;
-						device_id.Format( _T("\\\\.\\PHYSICALDRIVE%u"), extents->Extents[ extent ].DiskNumber );
+						device_id.Format( _T("\\\\.\\PHYSICALDRIVE%u"), buf_extents.extents.Extents[ extent ].DiskNumber );
 
 						// Add volume to owner device
 						if ( StrCmpI( device_id, Name ) == 0 )
@@ -142,16 +137,19 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 
 							if ( ! bSilent )
 							{
-								CString sVolumePathName = volume->Name;
-								for ( const auto& path : volume->PathNames )
+								CString names;
+								for ( const auto & path : volume->PathNames )
 								{
-									sVolumePathName += _T(' ');
-									sVolumePathName += path;
+									names += path;
+									names.TrimRight( _T('\\') );
+									names += _T(' ');
 								}
-								sVolumePathName += _T(" (");
-								sVolumePathName += FormatByteSize( extents->Extents[ extent ].ExtentLength.QuadPart );
-								sVolumePathName += _T(")");
-								Log( LOG_INFO, IDS_VOLUME_INFO, (LPCTSTR)sVolumePathName );
+								Log( LOG_INFO, IDS_VOLUME_INFO,
+									static_cast< LPCTSTR >( volume->Name ),
+									static_cast< LPCTSTR >( names ),
+									static_cast< LPCTSTR >( FormatByteSize( buf_extents.extents.Extents[ extent ].ExtentLength.QuadPart ) ),
+									buf_extents.extents.Extents[ extent ].StartingOffset.QuadPart,
+									buf_extents.extents.Extents[ extent ].StartingOffset.QuadPart / BytesPerSector() );
 							}
 
 							Volumes.emplace_back( std::move( volume ) );
@@ -175,20 +173,20 @@ bool CDevice::Open(bool bWrite)
 {
 	ASSERT( ! Name.IsEmpty() );
 
-	if ( m_h == NULL )
+	if ( ! m_h )
 	{
-		HRESULT hr = CAtlFile::Create( Name, ( bWrite ? GENERIC_WRITE : 0 ) | GENERIC_READ,
+		auto hr = CAtlFile::Create( Name, ( bWrite ? GENERIC_WRITE : 0 ) | GENERIC_READ,
 			FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING );
-		if ( FAILED( hr ) )
+		if ( FAILED( hr ) || ! m_h )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_MISSING, (LPCTSTR)GetErrorString( hr ) );
-			return false;;
+			Log( LOG_ERROR, IDS_DEVICE_MISSING, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
+			return false;
 		}
 
-		DWORD returned;
+		DWORD returned = 0;
 		if ( ! DeviceIoControl( m_h, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, nullptr, 0, &Info, sizeof( Info ), &returned, nullptr ) )
 		{
-			Log( LOG_WARNING, IDS_DEVICE_INFO_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			Log( LOG_WARNING, IDS_DEVICE_INFO_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 		}
 
 		if ( DeviceIoControl( m_h, IOCTL_DISK_IS_WRITABLE, nullptr, 0, nullptr, 0, &returned, nullptr ) )
@@ -205,14 +203,14 @@ bool CDevice::Open(bool bWrite)
 
 bool CDevice::Update()
 {
-	if ( m_h != NULL )
+	if ( m_h )
 	{
 		Log( LOG_ACTION, IDS_DEVICE_UPDATE );
 
 		DWORD returned;
 		if ( ! DeviceIoControl( m_h, IOCTL_DISK_UPDATE_PROPERTIES, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_UPDATE_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			Log( LOG_ERROR, IDS_DEVICE_UPDATE_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 			return false;
 		}
 		return true;
@@ -222,14 +220,14 @@ bool CDevice::Update()
 
 bool CDevice::Eject()
 {
-	if ( m_h != NULL )
+	if ( m_h )
 	{
 		Log( LOG_ACTION, IDS_DEVICE_EJECT );
 
 		DWORD returned;
 		if ( ! DeviceIoControl( m_h, IOCTL_STORAGE_EJECT_MEDIA, nullptr, 0, nullptr, 0, &returned, nullptr ) )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_EJECT_ERROR, (LPCTSTR)GetErrorString( GetLastError() ) );
+			Log( LOG_ERROR, IDS_DEVICE_EJECT_ERROR, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 			return false;
 		}
 		return true;

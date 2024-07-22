@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@ class CDevice : public CAtlFile
 {
 public:
 	CDevice(LPCTSTR szDeviceID = _T(""));
-	~CDevice();
 
 	// Initialize device information from WMI
 	bool Init(IWbemClassObject* disk);
@@ -46,13 +45,43 @@ public:
 	CString				Name;
 	CString				Model;
 	CString				Type;
-	DISK_GEOMETRY_EX	Info;
 	bool				Writable;
-	bool				Removable;
 	bool				System;
 	CDeviceVolumes		Volumes;
 
+	auto Removable() const noexcept
+	{
+		return ( Info.Geometry.MediaType != FixedMedia );
+	}
+
+	auto DiskSize() const noexcept
+	{
+		return Info.DiskSize.QuadPart;
+	}
+
+	auto BytesPerSector() const noexcept
+	{
+		return Info.Geometry.BytesPerSector ? Info.Geometry.BytesPerSector : 512;
+	}
+
+	auto Cylinders() const noexcept
+	{
+		return Info.Geometry.Cylinders.QuadPart;
+	}
+
+	auto TracksPerCylinder() const noexcept
+	{
+		return Info.Geometry.TracksPerCylinder;
+	}
+
+	auto SectorsPerTrack() const noexcept
+	{
+		return Info.Geometry.SectorsPerTrack;
+	}
+
 private:
+	DISK_GEOMETRY_EX	Info;
+
 	CDevice(const CDevice&) = delete;
 	CDevice& operator=(const CDevice&) = delete;
 };

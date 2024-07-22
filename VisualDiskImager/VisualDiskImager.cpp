@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,12 +26,14 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
 void Log(LogPriority nPriority, LPCTSTR szFormat, ...)
 {
 	va_list ap;
-	va_start( ap, szFormat );
+	va_start( ap, szFormat ); //-V2018 //-V2019
 	LogV( nPriority, szFormat, ap );
 	va_end( ap );
 }
@@ -39,23 +41,26 @@ void Log(LogPriority nPriority, LPCTSTR szFormat, ...)
 void Log(LogPriority nPriority, UINT nFormat, ...)
 {
 	va_list ap;
-	va_start( ap, nFormat );
+	va_start( ap, nFormat ); //-V2018 //-V2019
 	LogV( nPriority, LoadString( nFormat ), ap );
 	va_end( ap );
 }
 
 void LogV(LogPriority nPriority, LPCTSTR szFormat, va_list ap)
 {
-	CAutoPtr< CString > plog( new CString );
-	plog->FormatV( szFormat, ap );
+
+	const auto now = CTime::GetCurrentTime();
+
+	CAutoPtr< CString > plog( new CString( now.Format( _T("%T : ") ) ) );
+	plog->AppendFormatV( szFormat, ap );
 
 	if ( CWnd* pWnd = AfxGetMainWnd() )
 	{
-		pWnd->SendMessage( WM_LOG, nPriority, reinterpret_cast< LPARAM >( plog.Detach() ) );
+		pWnd->SendMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.Detach() ) );
 	}
 	else if ( theApp.m_pMainWnd )
 	{
-		theApp.m_pMainWnd->PostMessage( WM_LOG, nPriority, reinterpret_cast< LPARAM >( plog.Detach() ) );
+		theApp.m_pMainWnd->PostMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.Detach() ) );
 	}
 }
 
@@ -79,7 +84,7 @@ CString FormatByteSizeEx(LONGLONG nSize)
 	CString str = FormatByteSize( nSize );
 	if ( nSize >= 1024 )
 	{
-		str.AppendFormat( _T(" (%I64u %s)"), nSize, (LPCTSTR)FormatByteSize( 0 ).Trim( _T(" 0") ) );
+		str.AppendFormat( _T(" (%I64u %s)"), nSize, static_cast< LPCTSTR >( FormatByteSize( 0 ).Trim( _T(" 0") ) ) );
 	}
 	return str;
 }
@@ -90,7 +95,7 @@ CString GetErrorString(DWORD error)
 	str.Format( _T("0x%08x "), error );
 
 	LPTSTR errormessage = nullptr;
-	if ( FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, nullptr, error, 0, (LPTSTR)&errormessage, 0, nullptr ) )
+	if ( FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, nullptr, error, 0, reinterpret_cast< LPTSTR >( &errormessage ), 0, nullptr ) )
 	{
 		str += errormessage;
 		str.TrimRight( _T("\r\n") );
@@ -104,12 +109,6 @@ CString GetErrorString(DWORD error)
 
 BEGIN_MESSAGE_MAP(CVisualDiskImagerApp, CWinApp)
 END_MESSAGE_MAP()
-
-// CVisualDiskImagerApp construction
-
-CVisualDiskImagerApp::CVisualDiskImagerApp()
-{
-}
 
 // The one and only CVisualDiskImagerApp object
 
@@ -130,7 +129,7 @@ BOOL CVisualDiskImagerApp::InitInstance()
 	CWinApp::InitInstance();
 
 	// Activate "Windows Native" visual manager for enabling themes in MFC controls
-	CMFCVisualManager::SetDefaultManager( RUNTIME_CLASS( CMFCVisualManagerWindows ) );
+	CMFCVisualManager::SetDefaultManager( RUNTIME_CLASS( CMFCVisualManagerWindows ) ); //-V2018
 
 	SetRegistryKey( AFX_IDS_COMPANY_NAME );
 

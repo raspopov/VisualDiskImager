@@ -14,7 +14,7 @@
 #define IDS_DEVICE_EJECT                136
 #define IDS_DEVICE_EJECT_ERROR          137
 #define IDS_DEVICE_ENUM                 138
-#define IDS_DEVICE_FOUND                139
+#define IDS_DEVICE_INFO_LIST            139
 #define IDS_DEVICE_INFO                 140
 #define IDS_DEVICE_INFO_ERROR           141
 #define IDS_DEVICE_MISSING              142
@@ -29,7 +29,6 @@
 #define IDS_DONE                        151
 #define IDS_ENUM_VOLUME                 152
 #define IDS_FILE                        153
-#define IDS_FILE_DIRECTORY              154
 #define IDS_FILE_FILTER                 155
 #define IDS_FILE_MISSING                156
 #define IDS_FILE_READ_ERROR             157
@@ -60,6 +59,11 @@
 #define IDS_WRITE_PROMPT                182
 #define IDS_WRITING                     183
 #define IDS_CANCELED                    184
+#define IDS_WMI_CONNECT                 185
+#define IDS_WMI_CREATE                  186
+#define IDS_WMI_DISK                    187
+#define IDS_SUCCESS                     188
+#define IDS_DEVICE_NONE                 189
 #define IDC_BROWSE                      1000
 #define IDC_DEVICES                     1001
 #define IDC_REFRESH_BUTTON              1002

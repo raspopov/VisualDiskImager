@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -27,40 +27,36 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
 #endif
 
 // CVisualDiskImagerDlg
 
-void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, LPCTSTR szFilename, LPCTSTR szDevice)
+void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice)
 {
-	pThis->WriteDisk( szFilename, szDevice );
+	pThis->WriteDisk( sFilename, sDevice );
 
 	pThis->PostMessage( WM_DONE );
 }
 
-void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
+void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
 {
-	Log( LOG_ACTION, IDS_FILE, szFilename );
+	Log( LOG_ACTION, IDS_FILE, static_cast< LPCTSTR >( sFilename ) );
 
 	// Check file type
-	WIN32_FILE_ATTRIBUTE_DATA wfad = {};
-	if ( ! GetFileAttributesEx( szFilename, GetFileExInfoStandard, &wfad ) )
+	if ( ( GetFileAttributes( LONG_PATH + sFilename ) & FILE_ATTRIBUTE_DIRECTORY ) != 0 )
 	{
-		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( GetLastError() ) );
-		return;
-	}
-	if ( ( wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) != 0 )
-	{
-		Log( LOG_ERROR, IDS_FILE_DIRECTORY );
+		Log( LOG_ERROR, IDS_FILE_MISSING, static_cast< LPCTSTR >( GetErrorString( GetLastError() ) ) );
 		return;
 	}
 
 	// Open file
 	CAtlFile file;
-	HRESULT hr = file.Create( szFilename, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN );
+	auto hr = file.Create( LONG_PATH + sFilename, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN );
 	if ( FAILED( hr ) )
 	{
-		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( hr ) );
+		Log( LOG_ERROR, IDS_FILE_MISSING, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 		return;
 	}
 
@@ -69,7 +65,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 	hr = file.GetSize( file_size );
 	if ( FAILED( hr ) )
 	{
-		Log( LOG_ERROR, IDS_FILE_MISSING, (LPCTSTR)GetErrorString( hr ) );
+		Log( LOG_ERROR, IDS_FILE_MISSING, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 		return;
 	}
 	if ( file_size == 0 )
@@ -77,33 +73,33 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 		Log( LOG_ERROR, IDS_FILE_ZERO_SIZE );
 		return;
 	}
-	Log( LOG_INFO, IDS_FILE_SIZE, (LPCTSTR)FormatByteSizeEx( file_size ) );
+	Log( LOG_INFO, IDS_FILE_SIZE, static_cast< LPCTSTR >( FormatByteSizeEx( file_size ) ) );
 
-	CDevice device( szDevice );
+	CDevice device( sDevice );
 	device.GetDeviceVolumes( false );
 
 	// Lock device volumes
-	for ( const auto& volume : device.Volumes )
+	for ( const auto & volume : device.Volumes )
 	{
 		volume->Lock();
 	}
 
 	// Unmount device volumes
-	for ( const auto& volume : device.Volumes )
+	for ( const auto & volume : device.Volumes )
 	{
 		volume->Dismount();
 	}
 
 	// Open disk
-	Log( LOG_ACTION, IDS_DEVICE, szDevice );
+	Log( LOG_ACTION, IDS_DEVICE, static_cast< LPCTSTR >( sDevice ) );
 	if ( ! device.Open( m_Mode == MODE_WRITE || m_Mode == MODE_WRITE_VERIFY ) )
 	{
 		return;
 	}
 
 	// Check device size
-	const ULONGLONG disk_size = device.Info.DiskSize.QuadPart;
-	Log( LOG_INFO, IDS_DEVICE_SIZE, (LPCTSTR)FormatByteSizeEx( disk_size ) );
+	const ULONGLONG disk_size = device.DiskSize();
+	Log( LOG_INFO, IDS_DEVICE_SIZE, static_cast< LPCTSTR >( FormatByteSizeEx( disk_size ) ) );
 	if ( disk_size < file_size )
 	{
 		if ( disk_size == 0 )
@@ -117,9 +113,9 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 		}
 	}
 
-	const DWORD bytes_per_sector = device.Info.Geometry.BytesPerSector ? device.Info.Geometry.BytesPerSector : 512;
-	const ULONGLONG size = min( file_size, disk_size );
-	const DWORD buf_size = 2 * 1024 * bytes_per_sector; // 1MB
+	const auto bytes_per_sector = device.BytesPerSector();
+	const auto size = std::min( file_size, disk_size );
+	const auto buf_size = 2 * 1024 * bytes_per_sector; // 1MB
 	CVirtualBuffer< char > file_buf( buf_size );
 	ULONGLONG pos = 0;
 
@@ -128,32 +124,32 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 		// Write to disk
 		Log( LOG_ACTION, IDS_WRITING );
 
-		CTime start = CTime::GetCurrentTime();
+		const auto start = CTime::GetCurrentTime();
 
 		while ( pos != size && ! m_bCancel )
 		{
 			Sleep( 0 );
 
-			const DWORD to_read = (DWORD)min( size - pos, buf_size );
-			DWORD to_write = to_read;
+			const auto to_read = static_cast< DWORD >( std::min( size - pos, static_cast< ULONGLONG >( buf_size ) ) );
+			auto to_write = to_read;
 			if ( to_read % bytes_per_sector != 0 )
 			{
 				to_write = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
 
 				// Read incomplete sector from device
-				const DWORD last_pos = ( to_read / bytes_per_sector ) * bytes_per_sector;
+				const auto last_pos = ( to_read / bytes_per_sector ) * bytes_per_sector;
 				if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
 					 FAILED( hr = device.Read( static_cast< char* >( file_buf ) + last_pos, bytes_per_sector ) ) ||
 					 FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
 				{
-					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 					break;
 				}
 			}
 
 			if ( FAILED( hr = file.Read( file_buf, to_read ) ) )
 			{
-				Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				Log( LOG_ERROR, IDS_FILE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 				break;
 			}
 
@@ -162,13 +158,13 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 			{
 				pos += written;
 
-				Log( LOG_ERROR, IDS_DEVICE_WRITE_ERROR, (LPCTSTR)GetErrorString( hr ) );
+				Log( LOG_ERROR, IDS_DEVICE_WRITE_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 				break;
 			}
 
 			pos += to_read;
 
-			m_nProgress = (int)( ( pos * 100 ) / file_size );
+			m_nProgress = static_cast< int >( ( pos * 100 ) / file_size );
 		}
 
 		device.Flush();
@@ -176,12 +172,13 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 		if ( pos == size )
 		{
 			// Success
-			Log( LOG_INFO, IDS_WRITE_OK, ( CTime::GetCurrentTime() - start ).Format( _T("%H:%M:%S") ) );
+			const auto elapsed = CTime::GetCurrentTime() - start;
+			Log( LOG_INFO, IDS_WRITE_OK, static_cast< LPCTSTR >( elapsed.Format( _T("%H:%M:%S") ) ) );
 		}
 		else
 		{
 			// Errors
-			Log( LOG_WARNING, IDS_WRITE_ERROR, (LPCTSTR)FormatByteSize( pos ) );
+			Log( LOG_WARNING, IDS_WRITE_ERROR, static_cast< LPCTSTR >( FormatByteSize( pos ) ) );
 		}
 	}
 
@@ -196,11 +193,11 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 		pos = 0;
 		if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) )
 		{
-			Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+			Log( LOG_ERROR, IDS_FILE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 		}
 		else if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+			Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 		}
 		else
 		{
@@ -208,8 +205,8 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 			{
 				Sleep( 0 );
 
-				const DWORD to_read = (DWORD)min( size - pos, buf_size );
-				DWORD to_verify = to_read;
+				const auto to_read = static_cast< DWORD >( std::min( size - pos, static_cast< ULONGLONG >( buf_size ) ) );
+				auto to_verify = to_read;
 				if ( to_read % bytes_per_sector != 0 )
 				{
 					to_verify = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
@@ -217,19 +214,19 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 
 				if ( FAILED( hr = file.Read( file_buf, to_read ) ) )
 				{
-					Log( LOG_ERROR, IDS_FILE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					Log( LOG_ERROR, IDS_FILE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 					break;
 				}
 
 				if ( FAILED( hr = device.Read( device_buf, to_verify ) ) )
 				{
-					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, (LPCTSTR)GetErrorString( hr ) );
+					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 					break;
 				}
 
 				// Compare
-				DWORD count = to_read;
-				for ( char *p1 = file_buf, *p2 = device_buf; count; --count )
+				auto count = to_read;
+				for ( char * p1 = file_buf, *p2 = device_buf; count; --count )
 				{
 					if ( *p1++ != *p2++ )
 						break;
@@ -242,7 +239,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 
 				pos += to_read;
 
-				m_nProgress = (int)( ( pos * 100 ) / file_size );
+				m_nProgress = static_cast< int >( ( pos * 100 ) / file_size );
 			}
 
 			if ( pos == size )
@@ -254,7 +251,7 @@ void CVisualDiskImagerDlg::WriteDisk(LPCTSTR szFilename, LPCTSTR szDevice)
 	}
 
 	// Unlock device volumes
-	for ( const auto& volume : device.Volumes )
+	for ( const auto & volume : device.Volumes )
 	{
 		volume->Unlock();
 	}
