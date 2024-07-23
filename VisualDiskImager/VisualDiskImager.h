@@ -43,6 +43,8 @@ extern CVisualDiskImagerApp theApp;
 #define REG_VERIFY		_T("Verify")
 #define REG_OFFSET		_T("Offset")
 
+#define WMI_TIMEOUT		5000	// WMI query timeout (ms)
+
 // Log priority
 enum LogPriority { LOG_ERROR = 0, LOG_INFO, LOG_WARNING, LOG_ACTION, LOG_DEVICE, LOG_VOLUME };
 

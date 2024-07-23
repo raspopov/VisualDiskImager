@@ -62,7 +62,7 @@ void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 				{
 					CComPtr< IWbemClassObject > disk;
 					ULONG uReturn = 0;
-					hr = disks->Next( WBEM_INFINITE, 1, &disk, &uReturn );
+					hr = disks->Next( WMI_TIMEOUT, 1, &disk, &uReturn );
 					if ( FAILED( hr ) || uReturn == 0 )
 					{
 						break;
