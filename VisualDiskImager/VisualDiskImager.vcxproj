@@ -32,6 +32,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
+    <EnableASAN>true</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -47,6 +48,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
+    <EnableASAN>true</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -191,6 +193,7 @@
     <ClInclude Include="DeviceVolume.h" />
     <ClInclude Include="DialogExSized.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="Item.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="Sized.h" />
@@ -224,9 +227,11 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\action.ico" />
+    <Image Include="res\device.ico" />
     <Image Include="res\error.ico" />
     <Image Include="res\info.ico" />
     <Image Include="res\VisualDiskImager.ico" />
+    <Image Include="res\volume.ico" />
     <Image Include="res\warning.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

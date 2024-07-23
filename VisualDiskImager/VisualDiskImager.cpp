@@ -51,16 +51,16 @@ void LogV(LogPriority nPriority, LPCTSTR szFormat, va_list ap)
 
 	const auto now = CTime::GetCurrentTime();
 
-	CAutoPtr< CString > plog( new CString( now.Format( _T("%T : ") ) ) );
+	auto plog = std::make_unique< CString >( now.Format( _T("%T : ") ) );
 	plog->AppendFormatV( szFormat, ap );
 
 	if ( CWnd* pWnd = AfxGetMainWnd() )
 	{
-		pWnd->SendMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.Detach() ) );
+		pWnd->SendMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.release() ) );
 	}
 	else if ( theApp.m_pMainWnd )
 	{
-		theApp.m_pMainWnd->PostMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.Detach() ) );
+		theApp.m_pMainWnd->PostMessage( WM_LOG, static_cast< UINT >( nPriority ), reinterpret_cast< LPARAM >( plog.release() ) );
 	}
 }
 

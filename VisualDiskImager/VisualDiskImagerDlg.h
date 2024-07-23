@@ -46,16 +46,18 @@ protected:
 
 	CButton				m_wndWriteButton;	// "Write"/"Stop" button
 	CButton				m_wndVerifyButton;	// "Verify"/"Stop" button
-	CButton				m_wndRefreshButton;		// "Refresh" button
+	CButton				m_wndRefreshButton;	// "Refresh" button
 	CMFCEditBrowseCtrl	m_wndBrowse;
-	CComboBox			m_wndDevices;		// Enumerated devices list
+	CComboBoxEx			m_wndDevices;		// Enumerated devices list
 	CButton				m_wndVerifyCheckbox;
 	CProgressCtrl		m_wndProgress;
 	CListCtrl			m_wndLog;
+	CString				m_Filename;
+	int					m_Offset = 0;
 
 	std::thread			m_Thread;
 	volatile bool		m_bCancel = false;
-	CDevices			m_Devices;
+	CDevices			Devices;
 	int					m_nProgress = -1;	// 0-100% or -1
 	Mode				m_Mode = MODE_STOP;
 
@@ -81,11 +83,11 @@ protected:
 	// Enumerate disk volumes
 	void EnumDevices(bool bSilent);
 
-	// Return selected device
-	CDevice* GetSelectedDevice() const;
+	// Return selected device/volume
+	const CItem * GetSelected() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice);
-	void WriteDisk(CString sFilename, CString sDevice);
+	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice, ULONGLONG offset);
+	void WriteDisk(CString sFilename, CString sDevice, ULONGLONG offset);
 
 	// Clear the log (with animation)
 	void ClearLog();

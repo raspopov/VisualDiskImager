@@ -41,9 +41,10 @@ extern CVisualDiskImagerApp theApp;
 #define REG_IMAGE		_T("Image")
 #define REG_DEVICE		_T("Device")
 #define REG_VERIFY		_T("Verify")
+#define REG_OFFSET		_T("Offset")
 
 // Log priority
-enum LogPriority { LOG_ERROR = 0, LOG_INFO, LOG_WARNING, LOG_ACTION };
+enum LogPriority { LOG_ERROR = 0, LOG_INFO, LOG_WARNING, LOG_ACTION, LOG_DEVICE, LOG_VOLUME };
 
 void Log(LogPriority nPriority, LPCTSTR szFormat, ...);
 void Log(LogPriority nPriority, UINT nFormat, ...);

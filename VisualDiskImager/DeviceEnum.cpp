@@ -33,6 +33,7 @@ static char THIS_FILE[] = __FILE__;
 void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 {
 	// Looking for disk devices
+	CWaitCursor wc;
 
 	if ( ! bSilent ) { Log( LOG_ACTION, IDS_WMI_CREATE ); }
 
@@ -70,22 +71,7 @@ void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 					auto device = std::make_unique< CDevice >();
 					if ( device->Init( disk ) )
 					{
-						if ( ! bSilent )
-						{
-							Log( LOG_INFO, IDS_DEVICE_INFO,
-								static_cast< LPCTSTR >( device->Name ),
-								static_cast< LPCTSTR >( device->Model ),
-								static_cast< LPCTSTR >( FormatByteSize( device->DiskSize() ) ),
-								device->DiskSize() / device->BytesPerSector(),
-								device->Cylinders(),
-								device->TracksPerCylinder(),
-								device->SectorsPerTrack(),
-								static_cast< LPCTSTR >( FormatByteSize( device->BytesPerSector() ) ) );
-						}
-
-						device->GetDeviceVolumes( bSilent );
-
-						m_Devices.push_back( std::move( device ) );
+						Devices.emplace_back( std::move( device ) );
 					}
 					else
 					{
@@ -102,33 +88,99 @@ void CVisualDiskImagerDlg::EnumDevices(bool bSilent)
 
 	if ( ! bSilent && FAILED( hr ) ) { Log( LOG_WARNING, IDS_WMI_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) ); }
 
+	// Sort by name
+	std::sort( std::begin( Devices ), std::end( Devices ),
+		[](const auto & _left, const auto & _right) noexcept
+		{
+			return _left->Name.CompareNoCase( _right->Name ) < 0;
+		}
+	);
+
 	const CString sRemovable = LoadString( IDS_REMOVABLE );
 	const CString sFixed = LoadString( IDS_FIXED );
 	const CString sNotRecommended = LoadString( IDS_NOT_RECOMMENDED );
 
 	// Fill interface list
+	int selected = -1;
 	const CString sDefDeviceID = theApp.GetProfileString( REG_SETTINGS, REG_DEVICE );
-	for ( const auto& device : m_Devices )
+	for ( const auto & device : Devices )
 	{
-		CString sDevice;
-		sDevice.Format( IDS_DEVICE_INFO_LIST,
+		if ( ! bSilent )
+		{
+			Log( LOG_DEVICE, IDS_DEVICE_INFO,
+				static_cast< LPCTSTR >( device->Name ),
+				static_cast< LPCTSTR >( device->Model ),
+				static_cast< LPCTSTR >( FormatByteSize( device->Size() ) ),
+				device->Size() / device->BytesPerSector(),
+				device->Cylinders(),
+				device->TracksPerCylinder(),
+				device->SectorsPerTrack(),
+				static_cast< LPCTSTR >( FormatByteSize( device->BytesPerSector() ) ) );
+		}
+
+		device->GetDeviceVolumes( bSilent );
+
+		// Add device
+		CString str;
+		str.Format( IDS_DEVICE_INFO_LIST,
 			static_cast< LPCTSTR >( device->Name ),
 			static_cast< LPCTSTR >( device->Model ),
-			static_cast< LPCTSTR >( FormatByteSize( device->DiskSize() ) ),
+			static_cast< LPCTSTR >( FormatByteSize( device->Size() ) ),
 			static_cast< LPCTSTR >( device->Type ),
 			( device->Removable() ? static_cast< LPCTSTR >( sRemovable ) : static_cast< LPCTSTR >( sFixed ) ),
 			( ( device->Writable && ! device->System ) ? _T("") : static_cast< LPCTSTR >( sNotRecommended ) ) );
-
-		const int nIndex = m_wndDevices.AddString( sDevice );
-		ASSERT( nIndex != CB_ERR );
-		m_wndDevices.SetItemDataPtr( nIndex, device.get() );
-
-		// Select default one
-		if ( StrCmpI( sDefDeviceID, device->Name ) == 0 )
+		const COMBOBOXEXITEM device_item =
 		{
-			m_wndDevices.SetCurSel( nIndex );
+			CBEIF_TEXT | CBEIF_IMAGE | CBEIF_SELECTEDIMAGE | CBEIF_INDENT | CBEIF_LPARAM,
+			m_wndDevices.GetCount(),
+			str.GetBuffer(),
+			0,
+			LOG_DEVICE,
+			LOG_DEVICE,
+			0,
+			0,
+			reinterpret_cast< LPARAM >( device.get() )
+		};
+		auto index = m_wndDevices.InsertItem( &device_item );
+		ASSERT( index != CB_ERR );
+
+		// Select previous one, or removable, writable and not system
+		if ( StrCmpI( sDefDeviceID, device->Name ) == 0 || ( selected < 0 && device->Writable && ! device->System && device->Removable() ) )
+		{
+			selected = index;
+		}
+
+		// Add volumes
+		for ( const auto & volume : device->Volumes )
+		{
+			str.Format( IDS_VOLUME_INFO_LIST,
+				static_cast< LPCTSTR >( volume->Name ),
+				static_cast< LPCTSTR >( volume->Paths() ),
+				static_cast< LPCTSTR >( FormatByteSize( volume->Size() ) ) );
+			const COMBOBOXEXITEM volume_item =
+			{
+				CBEIF_TEXT | CBEIF_IMAGE | CBEIF_SELECTEDIMAGE | CBEIF_INDENT | CBEIF_LPARAM,
+				m_wndDevices.GetCount(),
+				str.GetBuffer(),
+				0,
+				LOG_VOLUME,
+				LOG_VOLUME,
+				0,
+				1,
+				reinterpret_cast< LPARAM >( volume.get() )
+			};
+			index = m_wndDevices.InsertItem( &volume_item );
+			ASSERT( index != CB_ERR );
+
+			// Select previous one
+			if ( StrCmpI( sDefDeviceID, volume->Name ) == 0 )
+			{
+				selected = index;
+			}
 		}
 	}
+
+	m_wndDevices.SetCurSel( selected );
 
 	if ( ! bSilent ) { Log( LOG_INFO, IDS_DONE ); }
 }

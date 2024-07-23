@@ -48,6 +48,9 @@
     <ClInclude Include="Version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Item.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="VisualDiskImager.cpp">
@@ -101,6 +104,12 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="res\action.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\device.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\volume.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

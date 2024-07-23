@@ -16,18 +16,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.If not, see < http://www.gnu.org/licenses/>.
 */
+
 #pragma once
 
 #include "DeviceVolume.h"
 
-// CDevice
+// CDevice (Name: \\?\Volume{guid} )
 
-class CDevice : public CAtlFile
+class CDevice : public CItem
 {
 public:
-	CDevice(LPCTSTR szDeviceID = _T(""));
+	CDevice(CString sDeviceID = CString()) : CItem( sDeviceID ) {}
+	virtual ~CDevice() {}
 
-	// Initialize device information from WMI
+	// Initialize device information
 	bool Init(IWbemClassObject* disk);
 
 	// Find all volumes of this device (fills Volumes member)
@@ -42,11 +44,10 @@ public:
 	// Eject device
 	bool Eject();
 
-	CString				Name;
 	CString				Model;
 	CString				Type;
-	bool				Writable;
-	bool				System;
+	bool				Writable = false;
+	bool				System = false;
 	CDeviceVolumes		Volumes;
 
 	auto Removable() const noexcept
@@ -54,12 +55,17 @@ public:
 		return ( Info.Geometry.MediaType != FixedMedia );
 	}
 
-	auto DiskSize() const noexcept
+	LONGLONG StartingOffset() const noexcept override
+	{
+		return 0;
+	}
+
+	LONGLONG Size() const noexcept override
 	{
 		return Info.DiskSize.QuadPart;
 	}
 
-	auto BytesPerSector() const noexcept
+	DWORD BytesPerSector() const noexcept override
 	{
 		return Info.Geometry.BytesPerSector ? Info.Geometry.BytesPerSector : 512;
 	}
@@ -80,10 +86,7 @@ public:
 	}
 
 private:
-	DISK_GEOMETRY_EX	Info;
-
-	CDevice(const CDevice&) = delete;
-	CDevice& operator=(const CDevice&) = delete;
+	DISK_GEOMETRY_EX	Info{};
 };
 
-typedef std::deque< std::unique_ptr< CDevice > > CDevices;
+using CDevices = std::deque< std::unique_ptr< CDevice > >;

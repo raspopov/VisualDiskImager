@@ -54,6 +54,7 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include <atlsafe.h>
 #include <atlfile.h>
 
+#include <algorithm>
 #include <deque>
 #include <memory>
 #include <thread>

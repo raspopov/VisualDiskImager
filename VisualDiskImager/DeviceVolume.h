@@ -19,13 +19,18 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #pragma once
 
-// CDeviceVolume
+#include "Item.h"
 
-class CDeviceVolume : public CAtlFile
+// CDeviceVolume (Name: \\?\Volume{guid} )
+
+class CDeviceVolume : public CItem
 {
 public:
-	CDeviceVolume(LPCTSTR szVolumeName = _T(""));
-	~CDeviceVolume();
+	CDeviceVolume(CString sVolumeName = CString()) : CItem( sVolumeName ) {}
+	virtual ~CDeviceVolume();
+
+	// Initialize device volume information
+	bool Init(const CItem * device, const DISK_EXTENT & extent);
 
 	// Open a volume
 	bool Open();
@@ -39,14 +44,29 @@ public:
 	// Dismount the volume
 	bool Dismount();
 
-	CString					Name;
-	std::deque< CString >	PathNames;
+	LONGLONG StartingOffset() const noexcept override
+	{
+		return Start;
+	}
+
+	LONGLONG Size() const noexcept override
+	{
+		return Length;
+	}
+
+	DWORD BytesPerSector() const noexcept override
+	{
+		return Parent->BytesPerSector();
+	}
+
+	CString Paths() const;
+
+	std::deque< CString >	PathNames;	// C:\, ...
 
 private:
-	bool					m_bLocked;
-
-	CDeviceVolume(const CDeviceVolume&) = delete;
-	CDeviceVolume& operator=(const CDeviceVolume&) = delete;
+	bool					m_bLocked = false;
+	LONGLONG				Start = 0;	// sectors
+	LONGLONG				Length = 0;	// bytes
 };
 
-typedef std::deque< std::unique_ptr< CDeviceVolume > > CDeviceVolumes;
+using CDeviceVolumes = std::deque< std::unique_ptr< CDeviceVolume > >;

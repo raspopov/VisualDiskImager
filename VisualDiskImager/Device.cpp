@@ -32,14 +32,6 @@ static char THIS_FILE[] = __FILE__;
 
 // CDevice
 
-CDevice::CDevice(LPCTSTR szDeviceID)
-	: Name		( szDeviceID )
-	, Info		()
-	, Writable	( false )
-	, System	( false )
-{
-}
-
 bool CDevice::Init(IWbemClassObject* disk)
 {
 	CComVariant id, model, type;
@@ -58,7 +50,7 @@ bool CDevice::Init(IWbemClassObject* disk)
 
 		if ( Open( false ) )
 		{
-			if ( DiskSize() == 0 )
+			if ( Size() == 0 )
 			{
 				Writable = false;
 			}
@@ -124,32 +116,12 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 				{
 					for ( DWORD extent = 0; extent < buf_extents.extents.NumberOfDiskExtents; ++ extent )
 					{
-						CString device_id;
-						device_id.Format( _T("\\\\.\\PHYSICALDRIVE%u"), buf_extents.extents.Extents[ extent ].DiskNumber );
-
 						// Add volume to owner device
-						if ( StrCmpI( device_id, Name ) == 0 )
+						if ( volume->Init( this, buf_extents.extents.Extents[ extent ] ) )
 						{
 							if ( bSystemVolume )
 							{
 								System = true;
-							}
-
-							if ( ! bSilent )
-							{
-								CString names;
-								for ( const auto & path : volume->PathNames )
-								{
-									names += path;
-									names.TrimRight( _T('\\') );
-									names += _T(' ');
-								}
-								Log( LOG_INFO, IDS_VOLUME_INFO,
-									static_cast< LPCTSTR >( volume->Name ),
-									static_cast< LPCTSTR >( names ),
-									static_cast< LPCTSTR >( FormatByteSize( buf_extents.extents.Extents[ extent ].ExtentLength.QuadPart ) ),
-									buf_extents.extents.Extents[ extent ].StartingOffset.QuadPart,
-									buf_extents.extents.Extents[ extent ].StartingOffset.QuadPart / BytesPerSector() );
 							}
 
 							Volumes.emplace_back( std::move( volume ) );
@@ -163,10 +135,27 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 		FindVolumeClose( hFindVolume );
 	}
 
-	if ( Volumes.empty() )
+	// Sort by starting offset
+	std::sort( std::begin( Volumes ), std::end( Volumes ),
+		[](const auto & _left, const auto & _right) noexcept
+		{
+			return _left->StartingOffset() < _right->StartingOffset();
+		}
+	);
+
+	if ( ! bSilent )
 	{
-		if ( ! bSilent ) Log( LOG_INFO, IDS_VOLUME_EMPTY );
+		for ( const auto & volume : Volumes )
+		{
+			Log( LOG_VOLUME, IDS_VOLUME_INFO,
+				static_cast< LPCTSTR >( volume->Name ),
+				static_cast< LPCTSTR >( volume->Paths() ),
+				static_cast< LPCTSTR >( FormatByteSize( volume->Size() ) ),
+				volume->StartingOffset() );
+		}
 	}
+
+	if ( ! bSilent && Volumes.empty() ) Log( LOG_INFO, IDS_VOLUME_EMPTY );
 }
 
 bool CDevice::Open(bool bWrite)

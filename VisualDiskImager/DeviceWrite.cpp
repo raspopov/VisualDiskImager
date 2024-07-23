@@ -33,14 +33,14 @@ static char THIS_FILE[] = __FILE__;
 
 // CVisualDiskImagerDlg
 
-void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice)
+void CVisualDiskImagerDlg::WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice, ULONGLONG offset)
 {
-	pThis->WriteDisk( sFilename, sDevice );
+	pThis->WriteDisk( sFilename, sDevice, offset );
 
 	pThis->PostMessage( WM_DONE );
 }
 
-void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
+void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice, ULONGLONG offset)
 {
 	Log( LOG_ACTION, IDS_FILE, static_cast< LPCTSTR >( sFilename ) );
 
@@ -98,7 +98,7 @@ void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
 	}
 
 	// Check device size
-	const ULONGLONG disk_size = device.DiskSize();
+	const ULONGLONG disk_size = device.Size();
 	Log( LOG_INFO, IDS_DEVICE_SIZE, static_cast< LPCTSTR >( FormatByteSizeEx( disk_size ) ) );
 	if ( disk_size < file_size )
 	{
@@ -117,59 +117,50 @@ void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
 	const auto size = std::min( file_size, disk_size );
 	const auto buf_size = 2 * 1024 * bytes_per_sector; // 1MB
 	CVirtualBuffer< char > file_buf( buf_size );
-	ULONGLONG pos = 0;
+	ULONGLONG completed = 0;
 
-	if ( ! m_bCancel && ( m_Mode == MODE_WRITE || m_Mode == MODE_WRITE_VERIFY ) )
+	hr = device.Seek( offset * device.BytesPerSector(), FILE_BEGIN );
+	if ( FAILED( hr ) )
+	{
+		Log( LOG_ERROR, IDS_DEVICE_SEEK_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
+		m_bCancel = true;
+	}
+	else if ( ! m_bCancel && ( m_Mode == MODE_WRITE || m_Mode == MODE_WRITE_VERIFY ) )
 	{
 		// Write to disk
 		Log( LOG_ACTION, IDS_WRITING );
 
 		const auto start = CTime::GetCurrentTime();
 
-		while ( pos != size && ! m_bCancel )
+		while ( completed != size && ! m_bCancel )
 		{
 			Sleep( 0 );
 
-			const auto to_read = static_cast< DWORD >( std::min( size - pos, static_cast< ULONGLONG >( buf_size ) ) );
-			auto to_write = to_read;
-			if ( to_read % bytes_per_sector != 0 )
-			{
-				to_write = ( to_read / bytes_per_sector + 1 ) * bytes_per_sector;
+			const auto to_read = static_cast< DWORD >( std::min( size - completed, static_cast< ULONGLONG >( buf_size ) ) );
 
-				// Read incomplete sector from device
-				const auto last_pos = ( to_read / bytes_per_sector ) * bytes_per_sector;
-				if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) ||
-					 FAILED( hr = device.Read( static_cast< char* >( file_buf ) + last_pos, bytes_per_sector ) ) ||
-					 FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
-				{
-					Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
-					break;
-				}
-			}
-
-			if ( FAILED( hr = file.Read( file_buf, to_read ) ) )
+			hr = file.Read( file_buf, to_read );
+			if ( FAILED( hr ) )
 			{
 				Log( LOG_ERROR, IDS_FILE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 				break;
 			}
 
 			DWORD written = 0;
-			if ( FAILED( hr = device.Write( file_buf, to_write, &written ) ) || written != to_write )
-			{
-				pos += written;
+			hr = device.Write( file_buf, to_read, &written );
+			completed += written;
 
+			if ( FAILED( hr ) || written != to_read )
+			{
 				Log( LOG_ERROR, IDS_DEVICE_WRITE_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
 				break;
 			}
 
-			pos += to_read;
-
-			m_nProgress = static_cast< int >( ( pos * 100 ) / file_size );
+			m_nProgress = static_cast< int >( ( completed * 100 ) / file_size );
 		}
 
 		device.Flush();
 
-		if ( pos == size )
+		if ( completed == size )
 		{
 			// Success
 			const auto elapsed = CTime::GetCurrentTime() - start;
@@ -178,34 +169,36 @@ void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
 		else
 		{
 			// Errors
-			Log( LOG_WARNING, IDS_WRITE_ERROR, static_cast< LPCTSTR >( FormatByteSize( pos ) ) );
+			Log( LOG_WARNING, IDS_WRITE_ERROR, static_cast< LPCTSTR >( FormatByteSize( completed ) ) );
 		}
 	}
 
 	Sleep( 500 );
 
-	if ( ! m_bCancel && ( m_Mode == MODE_VERIFY || ( m_Mode == MODE_WRITE_VERIFY && pos == size ) ) )
+	if ( ! m_bCancel && ( m_Mode == MODE_VERIFY || ( m_Mode == MODE_WRITE_VERIFY && completed == size ) ) )
 	{
 		// Verify disk
 		Log( LOG_ACTION, IDS_VERIFYING );
 
-		CVirtualBuffer< char > device_buf( buf_size );
-		pos = 0;
-		if ( FAILED( hr = file.Seek( pos, FILE_BEGIN ) ) )
+		if ( FAILED( hr = file.Seek( 0, FILE_BEGIN ) ) )
 		{
 			Log( LOG_ERROR, IDS_FILE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
+			m_bCancel = true;
 		}
-		else if ( FAILED( hr = device.Seek( pos, FILE_BEGIN ) ) )
+		else if ( FAILED( hr = device.Seek( offset * device.BytesPerSector(), FILE_BEGIN ) ) )
 		{
-			Log( LOG_ERROR, IDS_DEVICE_READ_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
+			Log( LOG_ERROR, IDS_DEVICE_SEEK_ERROR, static_cast< LPCTSTR >( GetErrorString( hr ) ) );
+			m_bCancel = true;
 		}
 		else
 		{
-			while ( pos != size && ! m_bCancel )
+			CVirtualBuffer< char > device_buf( buf_size );
+			completed = 0;
+			while ( completed != size && ! m_bCancel )
 			{
 				Sleep( 0 );
 
-				const auto to_read = static_cast< DWORD >( std::min( size - pos, static_cast< ULONGLONG >( buf_size ) ) );
+				const auto to_read = static_cast< DWORD >( std::min( size - completed, static_cast< ULONGLONG >( buf_size ) ) );
 				auto to_verify = to_read;
 				if ( to_read % bytes_per_sector != 0 )
 				{
@@ -233,16 +226,16 @@ void CVisualDiskImagerDlg::WriteDisk(CString sFilename, CString sDevice)
 				}
 				if ( count )
 				{
-					Log( LOG_ERROR, IDS_VERIFY_ERROR, pos + to_read - count );
+					Log( LOG_ERROR, IDS_VERIFY_ERROR, completed + to_read - count );
 					break;
 				}
 
-				pos += to_read;
+				completed += to_read;
 
-				m_nProgress = static_cast< int >( ( pos * 100 ) / file_size );
+				m_nProgress = static_cast< int >( ( completed * 100 ) / file_size );
 			}
 
-			if ( pos == size )
+			if ( completed == size )
 			{
 				// Success
 				Log( LOG_INFO, IDS_VERIFY_OK );

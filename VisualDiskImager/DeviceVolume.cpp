@@ -23,6 +23,7 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include "pch.h"
 #include "VisualDiskImager.h"
 #include "DeviceVolume.h"
+#include "Device.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -32,15 +33,36 @@ static char THIS_FILE[] = __FILE__;
 
 // CDeviceVolume
 
-CDeviceVolume::CDeviceVolume(LPCTSTR szVolumeName)
-	: Name		( szVolumeName )
-	, m_bLocked	( false )
-{
-}
-
 CDeviceVolume::~CDeviceVolume()
 {
 	Unlock();
+}
+
+bool CDeviceVolume::Init(const CItem * parent, const DISK_EXTENT & extent)
+{
+	CString str;
+	str.Format( _T("\\\\.\\PHYSICALDRIVE%u"), extent.DiskNumber );
+	if ( StrCmpI( parent->Name, str ) == 0 )
+	{
+		Parent = parent;
+		Start = extent.StartingOffset.QuadPart / BytesPerSector();
+		Length = extent.ExtentLength.QuadPart;
+		return true;
+	}
+
+	return false;
+}
+
+CString CDeviceVolume::Paths() const
+{
+	CString names;
+	for ( const auto & path : PathNames )
+	{
+		names += path;
+		names.TrimRight( _T('\\') );
+		names += _T(' ');
+	}
+	return names;
 }
 
 bool CDeviceVolume::Open()
@@ -49,7 +71,7 @@ bool CDeviceVolume::Open()
 
 	if ( ! m_h )
 	{
-		HRESULT hr = CAtlFile::Create( Name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
+		auto hr = CAtlFile::Create( Name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0 );
 		if ( FAILED( hr ) )
 		{
 			Log( LOG_WARNING, IDS_VOLUME_MISSING, static_cast< LPCTSTR >( GetErrorString( hr ) ) );

@@ -29,6 +29,7 @@
 #define IDS_DONE                        151
 #define IDS_ENUM_VOLUME                 152
 #define IDS_FILE                        153
+#define IDS_DEVICE_SEEK_ERROR           154
 #define IDS_FILE_FILTER                 155
 #define IDS_FILE_MISSING                156
 #define IDS_FILE_READ_ERROR             157
@@ -64,6 +65,9 @@
 #define IDS_WMI_DISK                    187
 #define IDS_SUCCESS                     188
 #define IDS_DEVICE_NONE                 189
+#define IDI_ICON_DEVICE                 190
+#define IDS_VOLUME_INFO_LIST            190
+#define IDI_ICON_VOLUME                 191
 #define IDC_BROWSE                      1000
 #define IDC_DEVICES                     1001
 #define IDC_REFRESH_BUTTON              1002
@@ -73,14 +77,15 @@
 #define IDC_VERIFY_BUTTON               1006
 #define IDC_EXIT_BUTTON                 1007
 #define IDC_WRITE_BUTTON                1008
+#define IDC_OFFSET                      1009
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        184
+#define _APS_NEXT_RESOURCE_VALUE        192
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1009
+#define _APS_NEXT_CONTROL_VALUE         1010
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
