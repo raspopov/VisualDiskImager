@@ -19,12 +19,16 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#ifndef STRICT
+	#define STRICT
+#endif
+
 #ifndef _SECURE_ATL
-#define _SECURE_ATL 1
+	#define _SECURE_ATL 1
 #endif
 
 #ifndef VC_EXTRALEAN
-#define VC_EXTRALEAN		// Exclude rarely-used stuff from Windows headers
+	#define VC_EXTRALEAN		// Exclude rarely-used stuff from Windows headers
 #endif
 
 #include "targetver.h"

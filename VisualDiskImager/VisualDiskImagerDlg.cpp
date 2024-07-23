@@ -417,11 +417,11 @@ void CVisualDiskImagerDlg::OnDropFiles(HDROP hDropInfo)
 
 		UpdateData( FALSE );
 
+		UpdateInterface();
+
 		DragFinish( hDropInfo );
 		return;
 	}
-
-	UpdateInterface();
 
 	CDialogExSized::OnDropFiles( hDropInfo );
 }

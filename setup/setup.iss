@@ -66,3 +66,5 @@ Name: "{app}"; Type: dirifempty
 Name: "{pf}\{#MyAppPublisher}"; Type: dirifempty
 Name: "{localappdata}\{#MyAppPublisher}\{#MyAppName}"; Type: filesandordirs
 Name: "{localappdata}\{#MyAppPublisher}"; Type: dirifempty
+
+#include "vcredist.iss"
