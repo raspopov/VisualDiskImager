@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -35,32 +35,35 @@ static char THIS_FILE[] = __FILE__;
 bool CDevice::Init(IWbemClassObject* disk)
 {
 	CComVariant id, model, type;
-	if ( SUCCEEDED( disk->Get( L"DeviceID", 0, &id, nullptr, nullptr ) ) &&
-		 SUCCEEDED( disk->Get( L"Model", 0, &model, nullptr, nullptr ) ) &&
-		 SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, nullptr, nullptr ) ) )
+
+	if ( SUCCEEDED( disk->Get( L"DeviceID", 0, &id, nullptr, nullptr ) ) && SUCCEEDED( id.ChangeType( VT_BSTR ) ) )
 	{
-		VERIFY( SUCCEEDED( id.ChangeType( VT_BSTR ) ) );
 		Name = id;
-
-		VERIFY( SUCCEEDED( model.ChangeType( VT_BSTR ) ) );
-		Model = model;
-
-		VERIFY( SUCCEEDED( type.ChangeType( VT_BSTR ) ) );
-		Type = type;
-
-		if ( Open( false ) )
-		{
-			if ( Size() == 0 )
-			{
-				Writable = false;
-			}
-
-			Close();
-		}
-
-		return true;
 	}
-	return false;
+
+	if ( SUCCEEDED( disk->Get( L"Model", 0, &model, nullptr, nullptr ) ) && SUCCEEDED( model.ChangeType( VT_BSTR ) ) )
+	{
+		Model = model;
+	}
+
+	if ( SUCCEEDED( disk->Get( L"InterfaceType", 0, &type, nullptr, nullptr ) ) && SUCCEEDED( type.ChangeType( VT_BSTR ) ) )
+	{
+		Type = type;
+	}
+
+	if ( ! Open( false ) )
+	{
+		return false;
+	}
+
+	if ( Size() == 0 )
+	{
+		Writable = false;
+	}
+
+	Close();
+
+	return true;
 }
 
 void CDevice::GetDeviceVolumes(bool bSilent)
@@ -160,7 +163,10 @@ void CDevice::GetDeviceVolumes(bool bSilent)
 
 bool CDevice::Open(bool bWrite)
 {
-	ASSERT( ! Name.IsEmpty() );
+	if ( Name.IsEmpty() )
+	{
+		return false;
+	}
 
 	if ( ! m_h )
 	{

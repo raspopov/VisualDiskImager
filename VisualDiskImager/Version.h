@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #define MAJOR_VERSION	1
 #define MINOR_VERSION	1
-#define PATCH_VERSION	0
+#define PATCH_VERSION	1
 
 #define STR_VALUE(arg)    		#arg
 #define STR_NAME(name)    		STR_VALUE(name)
