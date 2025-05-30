@@ -45,8 +45,11 @@ bool CDevice::Init(IWbemClassObject* disk)
 		VERIFY( SUCCEEDED( model.ChangeType( VT_BSTR ) ) );
 		Model = model;
 
-		VERIFY( SUCCEEDED( type.ChangeType( VT_BSTR ) ) );
-		Type = type;
+		if ( type.vt == VT_BSTR )
+		{
+			VERIFY( SUCCEEDED( type.ChangeType( VT_BSTR ) ) );
+			Type = type;
+		}
 
 		if ( Open( false ) )
 		{
