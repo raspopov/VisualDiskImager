@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -62,6 +62,7 @@ BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
 	ON_WM_DROPFILES()
 	ON_EN_CHANGE( IDC_BROWSE, &CVisualDiskImagerDlg::OnEnChangeBrowse )
 	ON_CBN_SELCHANGE( IDC_DEVICES, &CVisualDiskImagerDlg::OnCbnSelchangeDevices )
+	ON_BN_CLICKED( IDC_BROWSE, &CVisualDiskImagerDlg::OnBnClickedBrowseButton )
 	ON_BN_CLICKED( IDC_REFRESH_BUTTON, &CVisualDiskImagerDlg::OnBnClickedRefreshButton )
 	ON_BN_CLICKED( IDC_WRITE_BUTTON, &CVisualDiskImagerDlg::OnBnClickedWriteButton )
 	ON_BN_CLICKED( IDC_VERIFY_BUTTON, &CVisualDiskImagerDlg::OnBnClickedVerifyButton )
@@ -82,6 +83,8 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 {
 	CDialogExSized::OnInitDialog();
 
+	m_hAccels = LoadAccelerators( AfxFindResourceHandle( MAKEINTRESOURCE( IDR_ACCELERATOR ), ATL_RT_ACCELERATOR ), MAKEINTRESOURCE( IDR_ACCELERATOR ) );
+
 	CString sBinaryPath;
 	sBinaryPath.ReleaseBuffer( GetModuleFileName( nullptr, sBinaryPath.GetBuffer( 1024 ), 1024 ) );
 
@@ -95,19 +98,16 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 			UINT value_size = 0;
 			if ( VerQueryValue( buf.get(), _T("\\"), reinterpret_cast< LPVOID * >( &pTable ), &value_size ) && value_size )
 			{
-				sVersion.Format( _T("%u.%u.%u.%u"),
+				sVersion.Format( _T("%u.%u.%u"),
 					HIWORD( pTable->dwFileVersionMS ), LOWORD( pTable->dwFileVersionMS ),
-					HIWORD( pTable->dwFileVersionLS ), LOWORD( pTable->dwFileVersionLS ) );
+					HIWORD( pTable->dwFileVersionLS ) );
 			}
 		}
 	}
 
-	const bool bLoad = ( GetKeyState( VK_SHIFT ) >= 0 );
-
-	m_hIcon = theApp.LoadIcon( IDR_MAINFRAME );
-
 	SetWindowText( LoadString( AFX_IDS_APP_TITLE ) + _T(" ") + sVersion );
 
+	m_hIcon = theApp.LoadIcon( IDR_MAINFRAME );
 	SetIcon( m_hIcon, TRUE );		// Set big icon
 	SetIcon( m_hIcon, FALSE );		// Set small icon
 
@@ -125,11 +125,11 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 	m_wndLog.SetExtendedStyle( m_wndLog.GetExtendedStyle() | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_FULLROWSELECT );
 	m_wndLog.InsertColumn( 0, _T(""), LVCFMT_LEFT );
 
-	m_wndDevices.SetCueBanner( LoadString( IDS_DEVICE_SELECT ) );
+	m_wndDevices.SetCueBanner( LoadString( IDC_DEVICES ) );
 	m_wndDevices.SetImageList( &m_Images );
 
 	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ), OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST );
-	m_wndBrowse.SetCueBanner( LoadString( IDS_FILE_SELECT )  );
+	m_wndBrowse.SetCueBanner( LoadString( IDC_BROWSE )  );
 	m_wndBrowse.SetWindowText( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	SHAutoComplete( m_wndBrowse.GetSafeHwnd(), SHACF_FILESYS_ONLY | SHACF_URLHISTORY | SHACF_URLMRU | SHACF_USETAB );
 
@@ -151,7 +151,26 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 
 	DragAcceptFiles();
 
-	if ( bLoad )
+	if ( m_pToolTip.Create( this, TTS_ALWAYSTIP ) )
+	{
+		for ( auto pWnd = GetWindow( GW_CHILD ) ; pWnd ; pWnd = pWnd->GetNextWindow() )
+		{
+			const auto id = pWnd->GetDlgCtrlID();
+			if ( id > 0 )
+			{
+				CString tooltip;
+				if ( tooltip.LoadString( id ) && ! tooltip.IsEmpty() )
+				{
+					TRACE( _T("Load \"%s\" for %d\n"), (LPCTSTR)tooltip, id );
+					VERIFY( m_pToolTip.AddTool( pWnd, tooltip ) );
+				}
+			}
+		}
+		m_pToolTip.Activate( TRUE );
+		m_pToolTip.SetMaxTipWidth( 300 );
+	}
+
+	if ( GetKeyState( VK_SHIFT ) >= 0 )
 	{
 		RestoreWindowPlacement();
 	}
@@ -167,6 +186,18 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 	PostMessage( WM_ENUM );
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+BOOL CVisualDiskImagerDlg::PreTranslateMessage(MSG* pMsg)
+{
+	m_pToolTip.RelayEvent( pMsg );
+
+	if ( m_hAccels && TranslateAccelerator( m_hWnd, m_hAccels, pMsg ) )
+	{
+		return TRUE;
+	}
+
+	return CDialogExSized::PreTranslateMessage( pMsg );
 }
 
 void CVisualDiskImagerDlg::OnDestroy()
@@ -243,6 +274,11 @@ void CVisualDiskImagerDlg::OnCancel()
 	}
 
 	CDialogExSized::OnCancel();
+}
+
+void CVisualDiskImagerDlg::OnBnClickedBrowseButton()
+{
+	m_wndBrowse.OnBrowse();
 }
 
 void CVisualDiskImagerDlg::OnBnClickedRefreshButton()

@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -42,8 +42,9 @@ public:
 
 protected:
 	HICON				m_hIcon = nullptr;
+	HACCEL				m_hAccels = nullptr;
 	CImageList			m_Images;
-
+	CToolTipCtrl		m_pToolTip;
 	CButton				m_wndWriteButton;	// "Write"/"Stop" button
 	CButton				m_wndVerifyButton;	// "Verify"/"Stop" button
 	CButton				m_wndRefreshButton;	// "Refresh" button
@@ -100,6 +101,7 @@ protected:
 
 	void DoDataExchange(CDataExchange* pDX) override;
 	BOOL OnInitDialog() override;
+	BOOL PreTranslateMessage(MSG* pMsg) override;
 	void OnOK() override;
 	void OnCancel() override;
 
@@ -108,6 +110,7 @@ protected:
 	afx_msg void OnDestroy();
 	afx_msg void OnDropFiles(HDROP hDropInfo);
 	afx_msg void OnEnChangeBrowse();
+	afx_msg void OnBnClickedBrowseButton();
 	afx_msg void OnBnClickedRefreshButton();
 	afx_msg void OnBnClickedWriteButton();
 	afx_msg void OnBnClickedVerifyButton();

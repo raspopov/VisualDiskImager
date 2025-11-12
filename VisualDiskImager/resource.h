@@ -19,7 +19,6 @@
 #define IDS_DEVICE_INFO_ERROR           141
 #define IDS_DEVICE_MISSING              142
 #define IDS_DEVICE_READ_ERROR           143
-#define IDS_DEVICE_SELECT               144
 #define IDS_DEVICE_SIZE                 145
 #define IDS_DEVICE_SIZE_MISMATCH        146
 #define IDS_DEVICE_SKIP                 147
@@ -34,7 +33,6 @@
 #define IDS_FILE_MISSING                156
 #define IDS_FILE_READ_ERROR             157
 #define IDS_COPY                        158
-#define IDS_FILE_SELECT                 159
 #define IDS_FILE_SIZE                   160
 #define IDS_FILE_ZERO_SIZE              161
 #define IDS_FIXED                       162
@@ -68,6 +66,7 @@
 #define IDI_ICON_DEVICE                 190
 #define IDS_VOLUME_INFO_LIST            190
 #define IDI_ICON_VOLUME                 191
+#define IDR_ACCELERATOR                 192
 #define IDC_BROWSE                      1000
 #define IDC_DEVICES                     1001
 #define IDC_REFRESH_BUTTON              1002
@@ -83,8 +82,8 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        192
-#define _APS_NEXT_COMMAND_VALUE         32771
+#define _APS_NEXT_RESOURCE_VALUE        193
+#define _APS_NEXT_COMMAND_VALUE         32776
 #define _APS_NEXT_CONTROL_VALUE         1010
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
