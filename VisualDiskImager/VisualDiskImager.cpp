@@ -4,7 +4,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -118,7 +118,7 @@ CVisualDiskImagerApp theApp;
 
 BOOL CVisualDiskImagerApp::InitInstance()
 {
-	const INITCOMMONCONTROLSEX InitCtrls = { sizeof( InitCtrls ), ICC_WIN95_CLASSES | ICC_USEREX_CLASSES };
+	const INITCOMMONCONTROLSEX InitCtrls = { sizeof( InitCtrls ), ICC_WIN95_CLASSES | ICC_STANDARD_CLASSES | ICC_USEREX_CLASSES };
 	InitCommonControlsEx( &InitCtrls );
 
 	VERIFY( SUCCEEDED( CoInitializeEx( nullptr, COINIT_APARTMENTTHREADED ) ) );
@@ -126,23 +126,32 @@ BOOL CVisualDiskImagerApp::InitInstance()
 	VERIFY( SUCCEEDED( CoInitializeSecurity( nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
 		nullptr, EOAC_NONE, nullptr ) ) );
 
+	EnableHtmlHelp();
+
+	SetAppID( AfxGetAppName() );
+
+	SetRegistryKey( AFX_IDS_COMPANY_NAME );
+
 	CWinApp::InitInstance();
+
+	EnableTaskbarInteraction();
 
 	// Activate "Windows Native" visual manager for enabling themes in MFC controls
 	CMFCVisualManager::SetDefaultManager( RUNTIME_CLASS( CMFCVisualManagerWindows ) ); //-V2018
 
-	SetRegistryKey( AFX_IDS_COMPANY_NAME );
-
 	// Disable system error pop-ups
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX );
+
+	CCommandLineInfo cmdInfo;
+	ParseCommandLine( cmdInfo );
+	if ( ! cmdInfo.m_strFileName.IsEmpty() )
+	{
+		theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, cmdInfo.m_strFileName );
+	}
 
 	CVisualDiskImagerDlg dlg;
 	m_pMainWnd = &dlg;
 	dlg.DoModal();
-
-#if !defined(_AFXDLL) && !defined(_AFX_NO_MFC_CONTROLS_IN_DIALOGS)
-	ControlBarCleanUp();
-#endif
 
 	// Since the dialog has been closed, return FALSE so that we exit the
 	//  application, rather than start the application's message pump.

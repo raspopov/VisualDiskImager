@@ -36,7 +36,7 @@ overwhelming feature richness of [BOOTICE](https://www.google.com/search?q=booti
 
 ## License
 
-Copyright (C) 2020-2024 Nikolay Raspopov <<raspopov@cherubicsoft.com>>
+Copyright (C) 2020-2025 Nikolay Raspopov <<raspopov@cherubicsoft.com>>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
