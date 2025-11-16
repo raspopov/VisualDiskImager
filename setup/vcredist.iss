@@ -4,7 +4,7 @@
 
 #if Platform == "x64"
 	#define vcredist_exe	"VC_redist.x64.exe"
-	#define vcredist_url	"https://aka.ms/vs/15/release/VC_redist.x64.exe"
+	#define vcredist_url	"https://aka.ms/vs/16/release/VC_redist.x64.exe"
 #else
 	#define vcredist_exe	"VC_redist.x86.exe"
 	#define vcredist_url	"https://aka.ms/vs/15/release/VC_redist.x86.exe"
