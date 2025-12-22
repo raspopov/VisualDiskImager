@@ -133,7 +133,7 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 	m_wndBrowse.SetWindowText( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	SHAutoComplete( m_wndBrowse.GetSafeHwnd(), SHACF_FILESYS_ONLY | SHACF_URLHISTORY | SHACF_URLMRU | SHACF_USETAB );
 
-	m_Offset =  theApp.GetProfileInt( REG_SETTINGS, REG_OFFSET, 0 );
+	m_Offset =  theApp.GetProfileQWord( REG_SETTINGS, REG_OFFSET, 0 );
 
 	m_wndProgress.SetRange32( 0, 100 );
 
@@ -161,7 +161,7 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 				CString tooltip;
 				if ( tooltip.LoadString( id ) && ! tooltip.IsEmpty() )
 				{
-					TRACE( _T("Load \"%s\" for %d\n"), (LPCTSTR)tooltip, id );
+					TRACE( _T("Load \"%s\" for %d\n"), static_cast< LPCTSTR >( tooltip ), id );
 					VERIFY( m_pToolTip.AddTool( pWnd, tooltip ) );
 				}
 			}
@@ -208,7 +208,7 @@ void CVisualDiskImagerDlg::OnDestroy()
 
 	theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, m_Filename );
 
-	theApp.WriteProfileInt( REG_SETTINGS, REG_OFFSET, m_Offset );
+	theApp.WriteProfileQWord( REG_SETTINGS, REG_OFFSET, m_Offset );
 
 	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
 
@@ -431,7 +431,7 @@ LRESULT CVisualDiskImagerDlg::OnEnum(WPARAM wParam, LPARAM /*lParam*/)
 
 	if ( auto pdevice = GetSelected() )
 	{
-		m_Offset = static_cast< int >( pdevice->StartingOffset() );
+		m_Offset = pdevice->StartingOffset();
 
 		UpdateData( FALSE );
 	}
@@ -491,10 +491,10 @@ void CVisualDiskImagerDlg::OnCbnSelchangeDevices()
 
 	if ( auto pdevice = GetSelected() )
 	{
-		m_Offset = static_cast< int >( pdevice->StartingOffset() );
+		m_Offset = pdevice->StartingOffset();
 
 		theApp.WriteProfileString( REG_SETTINGS, REG_DEVICE, pdevice->Name );
-		theApp.WriteProfileInt( REG_SETTINGS, REG_OFFSET, m_Offset );
+		theApp.WriteProfileQWord( REG_SETTINGS, REG_OFFSET, m_Offset );
 
 		UpdateData( FALSE );
 	}
@@ -581,12 +581,12 @@ void CVisualDiskImagerDlg::CopyLog()
 		{
 			if ( EmptyClipboard() )
 			{
-				const size_t nLen = static_cast< size_t >( sData.GetLength() + 1 ) * sizeof( TCHAR );
+				const auto nLen = ( sData.GetLength() + 1 ) * sizeof( TCHAR );
 				if ( HGLOBAL hGlob = GlobalAlloc( GMEM_FIXED, nLen ) )
 				{
 					CopyMemory( hGlob, static_cast< LPCTSTR >( sData ), nLen );
 
-					if ( SetClipboardData( CF_UNICODETEXT, hGlob ) == NULL )
+					if ( ! SetClipboardData( CF_UNICODETEXT, hGlob ) )
 					{
 						// Ошибка
 						GlobalFree( hGlob );

@@ -54,7 +54,7 @@ protected:
 	CProgressCtrl		m_wndProgress;
 	CListCtrl			m_wndLog;
 	CString				m_Filename;
-	int					m_Offset = 0;
+	QWORD				m_Offset = 0;
 
 	std::thread			m_Thread;
 	volatile bool		m_bCancel = false;

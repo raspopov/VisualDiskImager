@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 #ifndef PCH_H
 #define PCH_H
+
+#pragma once
 
 // add headers that you want to pre-compile here
 #include "framework.h"

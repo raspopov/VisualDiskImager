@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,37 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 
 class CVisualDiskImagerApp : public CWinApp
 {
+public:
+	inline QWORD GetProfileQWord(LPCTSTR section, LPCTSTR entry, QWORD default_value)
+	{
+		if ( auto key = GetSectionKey( section ) )
+		{
+			QWORD value = 0;
+			DWORD type;
+			DWORD count = sizeof( QWORD );
+			auto result = RegQueryValueEx( key, entry, nullptr, &type, reinterpret_cast< BYTE * >( &value ), &count );
+			RegCloseKey( key );
+			if ( result == ERROR_SUCCESS &&
+				( type == REG_QWORD || type == REG_DWORD ) &&
+				( count == sizeof( QWORD ) || count == sizeof( DWORD ) ) )
+			{
+				return value;
+			}
+		}
+		return default_value;
+	}
+
+	inline BOOL WriteProfileQWord(LPCTSTR section, LPCTSTR entry, QWORD value)
+	{
+		if ( auto key = GetSectionKey( section ) )
+		{
+			auto result = RegSetValueEx( key, entry, NULL, REG_QWORD, reinterpret_cast< const BYTE * >( &value ), sizeof( QWORD ) );
+			RegCloseKey( key );
+			return result == ERROR_SUCCESS;
+		}
+		return FALSE;
+	}
+
 protected:
 	BOOL InitInstance() override;
 
