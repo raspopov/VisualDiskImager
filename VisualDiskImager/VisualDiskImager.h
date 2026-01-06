@@ -73,6 +73,7 @@ extern CVisualDiskImagerApp theApp;
 #define REG_DEVICE		_T("Device")
 #define REG_VERIFY		_T("Verify")
 #define REG_OFFSET		_T("Offset")
+#define REG_SIZE		_T("Size")
 
 #define WMI_TIMEOUT		5000	// WMI query timeout (ms)
 
@@ -105,7 +106,7 @@ public:
 		VirtualFree( buf, 0, MEM_RELEASE );
 	}
 
-	operator T*() const noexcept
+	inline operator T*() const noexcept
 	{
 		return static_cast< T* >( buf );
 	}

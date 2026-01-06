@@ -12,10 +12,10 @@ overwhelming feature richness of [BOOTICE](https://www.google.com/search?q=booti
 
 ## Features
 
- - Writing a [disk image file (*.IMG)](https://en.wikipedia.org/wiki/IMG_(file_format)) to the Windows physical device i.e. to "\\\\.\\PHYSICALDRIVEn" (where "n" is a zero-based disk number). 
+ - Reading, writing and verifying [disk image](https://en.wikipedia.org/wiki/IMG_(file_format)) files (*.IMG) to physical device (for Windows to the "\\\\.\\PHYSICALDRIVEn", "n" is a zero-based disk number).
  - Verification after writing.
  - A comprehensive log (supporting copy to clipboard).
- - Device change autodetection.
+ - Auto-detection of device changes.
  - Drag-n-drop.
 
 ![Visual Disk Imager](https://raw.githubusercontent.com/raspopov/VisualDiskImager/master/VisualDiskImager.png)

@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -22,16 +22,18 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 class CItem : public CAtlFile
 {
 public:
-	CItem(CString name = CString()) : Name( name ) {}
+	inline CItem() noexcept = default;
+	inline CItem(const CString & name) : Name( name ) {}
+	virtual ~CItem() = default;
 
 	CString			Name;
 	const CItem *	Parent = nullptr;
 
-	virtual LONGLONG StartingOffset() const noexcept = 0;	// sectors
-	virtual LONGLONG Size() const noexcept = 0;				// bytes
+	virtual ULONGLONG StartingOffset() const noexcept = 0;	// sectors
+	virtual ULONGLONG Size() const noexcept = 0;			// bytes
 	virtual DWORD BytesPerSector() const noexcept = 0;		// bytes
 
-	const CItem * Top() const noexcept
+	inline const CItem * Top() const noexcept
 	{
 		return Parent ? Parent->Top() : this;
 	}

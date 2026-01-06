@@ -48,11 +48,12 @@ void Log(LogPriority nPriority, UINT nFormat, ...)
 
 void LogV(LogPriority nPriority, LPCTSTR szFormat, va_list ap)
 {
-
 	const auto now = CTime::GetCurrentTime();
 
 	auto plog = std::make_unique< CString >( now.Format( _T("%T : ") ) );
 	plog->AppendFormatV( szFormat, ap );
+
+	TRACE( _T("%s\n"), plog->operator const WCHAR *() );
 
 	if ( CWnd* pWnd = AfxGetMainWnd() )
 	{

@@ -23,7 +23,7 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include "DialogExSized.h"
 
 // Process modes
-enum Mode { MODE_STOP = 0, MODE_WRITE, MODE_WRITE_VERIFY, MODE_VERIFY };
+enum Mode { MODE_STOP = 0, MODE_WRITE, MODE_WRITE_VERIFY, MODE_VERIFY, MODE_READ };
 
 #define WM_LOG		( WM_USER + 1 )	// Log window message
 #define WM_DONE		( WM_USER + 2 )	// End of task message
@@ -47,6 +47,7 @@ protected:
 	CToolTipCtrl		m_pToolTip;
 	CButton				m_wndWriteButton;	// "Write"/"Stop" button
 	CButton				m_wndVerifyButton;	// "Verify"/"Stop" button
+	CButton				m_wndReadButton;	// "Read"/"Stop" button
 	CButton				m_wndRefreshButton;	// "Refresh" button
 	CMFCEditBrowseCtrl	m_wndBrowse;
 	CComboBoxEx			m_wndDevices;		// Enumerated devices list
@@ -54,7 +55,8 @@ protected:
 	CProgressCtrl		m_wndProgress;
 	CListCtrl			m_wndLog;
 	CString				m_Filename;
-	QWORD				m_Offset = 0;
+	ULONGLONG			m_Offset = 0;
+	ULONGLONG			m_Size = 0;
 
 	std::thread			m_Thread;
 	volatile bool		m_bCancel = false;
@@ -87,8 +89,10 @@ protected:
 	// Return selected device/volume
 	const CItem * GetSelected() const;
 
-	static void WriteDiskThread(CVisualDiskImagerDlg* pThis, CString sFilename, CString sDevice, ULONGLONG offset);
-	void WriteDisk(CString sFilename, CString sDevice, ULONGLONG offset);
+	static void DeviceOperationThread(CVisualDiskImagerDlg* pThis, Mode mode, CString sFilename, CString sDevice, ULONGLONG offset, ULONGLONG size);
+	void DeviceOperation(Mode mode, CString sFilename, CString sDevice, ULONGLONG offset, ULONGLONG size);
+	bool DeviceOperationWrite(CDevice & device, CAtlFile & file, ULONGLONG offset, ULONGLONG size);
+	bool DeviceOperationRead(CDevice & device, CAtlFile & file, ULONGLONG offset, ULONGLONG size, bool isVerify);
 
 	// Clear the log (with animation)
 	void ClearLog();
@@ -98,6 +102,21 @@ protected:
 
 	// Select all lines of log
 	void SelectLogAll();
+
+	inline void Progress(int progress) noexcept
+	{
+		m_nProgress = progress;
+	}
+
+	inline void Cancel(bool cancel = true) noexcept
+	{
+		m_bCancel = cancel;
+	}
+
+	inline bool isCancelled() const noexcept
+	{
+		return m_bCancel;
+	}
 
 	void DoDataExchange(CDataExchange* pDX) override;
 	BOOL OnInitDialog() override;
@@ -114,6 +133,7 @@ protected:
 	afx_msg void OnBnClickedRefreshButton();
 	afx_msg void OnBnClickedWriteButton();
 	afx_msg void OnBnClickedVerifyButton();
+	afx_msg void OnBnClickedReadButton();
 	afx_msg void OnBnClickedExitButton();
 	afx_msg void OnCbnSelchangeDevices();
 	afx_msg void OnSize(UINT nType, int cx, int cy);

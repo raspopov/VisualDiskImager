@@ -67,6 +67,10 @@
 #define IDS_VOLUME_INFO_LIST            190
 #define IDI_ICON_VOLUME                 191
 #define IDR_ACCELERATOR                 192
+#define IDS_READ                        200
+#define IDS_READING                     201
+#define IDS_FILE_WRITE_ERROR            202
+#define IDS_READ_OK                     203
 #define IDC_BROWSE                      1000
 #define IDC_DEVICES                     1001
 #define IDC_REFRESH_BUTTON              1002
@@ -77,13 +81,15 @@
 #define IDC_EXIT_BUTTON                 1007
 #define IDC_WRITE_BUTTON                1008
 #define IDC_OFFSET                      1009
+#define IDC_READ_BUTTON                 1010
+#define IDC_DEVICE_SIZE                 1011
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        193
-#define _APS_NEXT_COMMAND_VALUE         32776
+#define _APS_NEXT_RESOURCE_VALUE        204
+#define _APS_NEXT_COMMAND_VALUE         32778
 #define _APS_NEXT_CONTROL_VALUE         1010
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

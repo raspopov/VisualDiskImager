@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,8 +26,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 class CDevice : public CItem
 {
 public:
-	CDevice(CString sDeviceID = CString()) : CItem( sDeviceID ) {}
-	virtual ~CDevice() {}
+	CDevice() noexcept = default;
+	CDevice(const CString & sDeviceID) : CItem( sDeviceID ) {}
 
 	// Initialize device information
 	bool Init(IWbemClassObject* disk);
@@ -50,17 +50,17 @@ public:
 	bool				System = false;
 	CDeviceVolumes		Volumes;
 
-	auto Removable() const noexcept
+	inline auto Removable() const noexcept
 	{
 		return ( Info.Geometry.MediaType != FixedMedia );
 	}
 
-	LONGLONG StartingOffset() const noexcept override
+	ULONGLONG StartingOffset() const noexcept override
 	{
 		return 0;
 	}
 
-	LONGLONG Size() const noexcept override
+	ULONGLONG Size() const noexcept override
 	{
 		return Info.DiskSize.QuadPart;
 	}
@@ -70,17 +70,17 @@ public:
 		return Info.Geometry.BytesPerSector ? Info.Geometry.BytesPerSector : 512;
 	}
 
-	auto Cylinders() const noexcept
+	inline auto Cylinders() const noexcept
 	{
 		return Info.Geometry.Cylinders.QuadPart;
 	}
 
-	auto TracksPerCylinder() const noexcept
+	inline auto TracksPerCylinder() const noexcept
 	{
 		return Info.Geometry.TracksPerCylinder;
 	}
 
-	auto SectorsPerTrack() const noexcept
+	inline auto SectorsPerTrack() const noexcept
 	{
 		return Info.Geometry.SectorsPerTrack;
 	}

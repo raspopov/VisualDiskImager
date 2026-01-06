@@ -205,8 +205,8 @@
   <ItemGroup>
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="DeviceEnum.cpp" />
+    <ClCompile Include="DeviceOperation.cpp" />
     <ClCompile Include="DeviceVolume.cpp" />
-    <ClCompile Include="DeviceWrite.cpp" />
     <ClCompile Include="DialogExSized.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

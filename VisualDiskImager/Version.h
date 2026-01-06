@@ -22,8 +22,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 #include "Build.h"
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	2
-#define PATCH_VERSION	1
+#define MINOR_VERSION	3
+#define PATCH_VERSION	0
 
 #define STR_VALUE(arg)    		#arg
 #define STR_NAME(name)    		STR_VALUE(name)

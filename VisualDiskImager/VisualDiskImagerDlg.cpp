@@ -51,7 +51,9 @@ void CVisualDiskImagerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_REFRESH_BUTTON, m_wndRefreshButton);
 	DDX_Control(pDX, IDC_VERIFY_CHECK, m_wndVerifyCheckbox);
 	DDX_Control(pDX, IDC_VERIFY_BUTTON, m_wndVerifyButton);
+	DDX_Control(pDX, IDC_READ_BUTTON, m_wndReadButton);
 	DDX_Text(pDX, IDC_OFFSET, m_Offset);
+	DDX_Text(pDX, IDC_DEVICE_SIZE, m_Size);
 	DDX_Text(pDX, IDC_BROWSE, m_Filename);
 }
 
@@ -66,6 +68,7 @@ BEGIN_MESSAGE_MAP(CVisualDiskImagerDlg, CDialogExSized)
 	ON_BN_CLICKED( IDC_REFRESH_BUTTON, &CVisualDiskImagerDlg::OnBnClickedRefreshButton )
 	ON_BN_CLICKED( IDC_WRITE_BUTTON, &CVisualDiskImagerDlg::OnBnClickedWriteButton )
 	ON_BN_CLICKED( IDC_VERIFY_BUTTON, &CVisualDiskImagerDlg::OnBnClickedVerifyButton )
+	ON_BN_CLICKED( IDC_READ_BUTTON, &CVisualDiskImagerDlg::OnBnClickedReadButton )
 	ON_BN_CLICKED( IDC_EXIT_BUTTON, &CVisualDiskImagerDlg::OnBnClickedExitButton )
 	ON_WM_SIZE()
 	ON_MESSAGE( WM_LOG, &CVisualDiskImagerDlg::OnLog )
@@ -128,12 +131,13 @@ BOOL CVisualDiskImagerDlg::OnInitDialog()
 	m_wndDevices.SetCueBanner( LoadString( IDC_DEVICES ) );
 	m_wndDevices.SetImageList( &m_Images );
 
-	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ), OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST );
+	m_wndBrowse.EnableFileBrowseButton( nullptr, LoadString( IDS_FILE_FILTER ) );
 	m_wndBrowse.SetCueBanner( LoadString( IDC_BROWSE )  );
 	m_wndBrowse.SetWindowText( theApp.GetProfileString( REG_SETTINGS, REG_IMAGE ) );
 	SHAutoComplete( m_wndBrowse.GetSafeHwnd(), SHACF_FILESYS_ONLY | SHACF_URLHISTORY | SHACF_URLMRU | SHACF_USETAB );
 
-	m_Offset =  theApp.GetProfileQWord( REG_SETTINGS, REG_OFFSET, 0 );
+	m_Offset =  theApp.GetProfileQWord( REG_SETTINGS, REG_OFFSET, m_Offset );
+	m_Size =  theApp.GetProfileQWord( REG_SETTINGS, REG_SIZE, m_Size );
 
 	m_wndProgress.SetRange32( 0, 100 );
 
@@ -209,6 +213,7 @@ void CVisualDiskImagerDlg::OnDestroy()
 	theApp.WriteProfileString( REG_SETTINGS, REG_IMAGE, m_Filename );
 
 	theApp.WriteProfileQWord( REG_SETTINGS, REG_OFFSET, m_Offset );
+	theApp.WriteProfileQWord( REG_SETTINGS, REG_SIZE, m_Size );
 
 	theApp.WriteProfileInt( REG_SETTINGS, REG_VERIFY, ( m_wndVerifyCheckbox.GetCheck() == BST_CHECKED ) ? TRUE : FALSE );
 
@@ -306,7 +311,7 @@ void CVisualDiskImagerDlg::OnBnClickedWriteButton()
 		// "Stop" button pressed
 		if ( AfxMessageBox( IDS_CANCEL_ASK, MB_ICONEXCLAMATION | MB_YESNO ) == IDYES )
 		{
-			m_bCancel = true;
+			Cancel();
 
 			m_wndWriteButton.EnableWindow( FALSE );
 		}
@@ -328,7 +333,7 @@ void CVisualDiskImagerDlg::OnBnClickedVerifyButton()
 	if ( IsStarted() )
 	{
 		// "Stop" button pressed
-		m_bCancel = true;
+		Cancel();
 
 		m_wndVerifyButton.EnableWindow( FALSE );
 	}
@@ -339,30 +344,67 @@ void CVisualDiskImagerDlg::OnBnClickedVerifyButton()
 	}
 }
 
+void CVisualDiskImagerDlg::OnBnClickedReadButton()
+{
+	UpdateData();
+
+	if ( IsStarted() )
+	{
+		// "Stop" button pressed
+		Cancel();
+
+		m_wndReadButton.EnableWindow( FALSE );
+	}
+	else
+	{
+		// "Verify" button pressed
+		Start( MODE_READ );
+	}
+}
+
 void CVisualDiskImagerDlg::UpdateInterface()
 {
 	UpdateData();
 
-	const auto exist = ! m_Filename.IsEmpty() && ( GetFileAttributes( LONG_PATH + m_Filename ) & FILE_ATTRIBUTE_DIRECTORY ) == 0 && GetSelected() != nullptr;
+	const auto available = ! m_Filename.IsEmpty() && GetSelected() != nullptr;
+	const auto exist = available && ( GetFileAttributes( LONG_PATH + m_Filename ) & FILE_ATTRIBUTE_DIRECTORY ) == 0;
+
+	static const auto write = LoadString( IDS_WRITE );
+	static const auto verify = LoadString( IDS_VERIFY );
+	static const auto read = LoadString( IDS_READ );
+	static const auto cancel = LoadString( IDS_CANCEL );
 
 	switch ( m_Mode )
 	{
 	case MODE_WRITE:
 	case MODE_WRITE_VERIFY:
-		m_wndWriteButton.SetWindowText( LoadString( IDS_CANCEL ) );
+		m_wndWriteButton.EnableWindow( TRUE );
+		m_wndWriteButton.SetWindowText( cancel );
 		m_wndVerifyButton.EnableWindow( FALSE );
+		m_wndReadButton.EnableWindow( FALSE );
 		break;
 
 	case MODE_VERIFY:
 		m_wndWriteButton.EnableWindow( FALSE );
-		m_wndVerifyButton.SetWindowText( LoadString( IDS_CANCEL ) );
+		m_wndVerifyButton.EnableWindow( TRUE );
+		m_wndVerifyButton.SetWindowText( cancel );
+		m_wndReadButton.EnableWindow( FALSE );
+		break;
+
+	case MODE_READ:
+		m_wndWriteButton.EnableWindow( FALSE );
+		m_wndVerifyButton.EnableWindow( FALSE );
+		m_wndReadButton.EnableWindow( TRUE );
+		m_wndReadButton.SetWindowText( cancel );
 		break;
 
 	default:
-		m_wndWriteButton.SetWindowText( LoadString( IDS_WRITE ) );
+		m_wndWriteButton.SetWindowText( write );
 		m_wndWriteButton.EnableWindow( exist ? TRUE : FALSE );
-		m_wndVerifyButton.SetWindowText( LoadString( IDS_VERIFY ) );
+		m_wndVerifyButton.SetWindowText( verify );
 		m_wndVerifyButton.EnableWindow( exist ? TRUE : FALSE );
+		m_wndReadButton.SetWindowText( read );
+		m_wndReadButton.EnableWindow( available ? TRUE : FALSE );
 	}
 
 	m_wndRefreshButton.EnableWindow( ( m_Mode == MODE_STOP ) );
@@ -370,48 +412,10 @@ void CVisualDiskImagerDlg::UpdateInterface()
 	m_wndDevices.EnableWindow( ( m_Mode == MODE_STOP ) );
 	m_wndVerifyCheckbox.EnableWindow( ( m_Mode == MODE_STOP ) );
 
-	m_nProgress = ( m_Mode == MODE_STOP ) ? -1 : 0;
+	Progress( ( m_Mode == MODE_STOP ) ? -1 : 0 );
 	m_wndProgress.ShowWindow( ( m_Mode == MODE_STOP ) ? SW_HIDE : SW_SHOW );
 
 	UpdateWindow();
-}
-
-void CVisualDiskImagerDlg::Start(Mode mode)
-{
-	if ( auto pdevice = GetSelected() )
-	{
-		m_Mode = mode;
-
-		UpdateInterface();
-
-		m_bCancel = false;
-		m_Thread = std::thread( &CVisualDiskImagerDlg::WriteDiskThread, this, m_Filename, pdevice->Top()->Name, m_Offset );
-	}
-}
-
-void CVisualDiskImagerDlg::Stop()
-{
-	if ( IsStarted() )
-	{
-		m_bCancel = true;
-
-		try
-		{
-			m_Thread.join();
-		}
-		catch (...)
-		{
-		}
-
-		if ( IsStarted() )
-		{
-			m_Thread.detach();
-		}
-	}
-
-	m_Mode = MODE_STOP;
-
-	UpdateInterface();
 }
 
 LRESULT CVisualDiskImagerDlg::OnDone(WPARAM /*wParam*/, LPARAM /*lParam*/)
@@ -432,6 +436,7 @@ LRESULT CVisualDiskImagerDlg::OnEnum(WPARAM wParam, LPARAM /*lParam*/)
 	if ( auto pdevice = GetSelected() )
 	{
 		m_Offset = pdevice->StartingOffset();
+		m_Size = pdevice->Size();
 
 		UpdateData( FALSE );
 	}
@@ -492,9 +497,11 @@ void CVisualDiskImagerDlg::OnCbnSelchangeDevices()
 	if ( auto pdevice = GetSelected() )
 	{
 		m_Offset = pdevice->StartingOffset();
+		m_Size = pdevice->Size();
 
 		theApp.WriteProfileString( REG_SETTINGS, REG_DEVICE, pdevice->Name );
 		theApp.WriteProfileQWord( REG_SETTINGS, REG_OFFSET, m_Offset );
+		theApp.WriteProfileQWord( REG_SETTINGS, REG_SIZE, m_Size );
 
 		UpdateData( FALSE );
 	}

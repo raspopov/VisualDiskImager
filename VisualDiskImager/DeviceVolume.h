@@ -1,7 +1,7 @@
 /*
 This file is part of Visual Disk Imager
 
-Copyright (C) 2020-2024 Nikolay Raspopov <raspopov@cherubicsoft.com>
+Copyright (C) 2020-2025 Nikolay Raspopov <raspopov@cherubicsoft.com>
 
 This program is free software : you can redistribute it and / or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,8 @@ along with this program.If not, see < http://www.gnu.org/licenses/>.
 class CDeviceVolume : public CItem
 {
 public:
-	CDeviceVolume(CString sVolumeName = CString()) : CItem( sVolumeName ) {}
+	CDeviceVolume() noexcept = default;
+	CDeviceVolume(const CString & sVolumeName) : CItem( sVolumeName ) {}
 	virtual ~CDeviceVolume();
 
 	// Initialize device volume information
@@ -44,14 +45,20 @@ public:
 	// Dismount the volume
 	bool Dismount();
 
-	LONGLONG StartingOffset() const noexcept override
+	ULONGLONG StartingOffset() const noexcept override
 	{
 		return Start;
 	}
 
-	LONGLONG Size() const noexcept override
+	ULONGLONG Size() const noexcept override
 	{
 		return Length;
+	}
+
+	inline bool isOverlap(ULONGLONG start, ULONGLONG length) const noexcept
+	{
+		return ( Start * BytesPerSector() <= start * BytesPerSector() + length ) &&
+			   ( start * BytesPerSector() <= Start * BytesPerSector() + Length );
 	}
 
 	DWORD BytesPerSector() const noexcept override
@@ -65,8 +72,8 @@ public:
 
 private:
 	bool					m_bLocked = false;
-	LONGLONG				Start = 0;	// sectors
-	LONGLONG				Length = 0;	// bytes
+	ULONGLONG				Start = 0;	// sectors
+	ULONGLONG				Length = 0;	// bytes
 };
 
 using CDeviceVolumes = std::deque< std::unique_ptr< CDeviceVolume > >;
